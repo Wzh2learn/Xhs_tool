@@ -1,0 +1,28 @@
+# 敏感文件 - 绝对不要提交！
+xhs_cookies.json
+*.cookies.json
+
+# Node.js
+node_modules/
+package-lock.json
+
+# 运行时产生的文件
+reports/
+data/
+error_screenshot.png
+
+# 已发布内容 (包含个人信息)
+content/published/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
