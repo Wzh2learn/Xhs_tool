@@ -4,6 +4,7 @@
 import { Page } from 'puppeteer';
 import * as fs from 'fs';
 import { SAFETY_CONFIG, COOKIES_PATH } from './config';
+import { logger } from './logger';
 
 // === 延时函数 ===
 
@@ -108,7 +109,7 @@ export async function humanType(page: Page, selector: string, text: string): Pro
 
 /** 模拟人类滚动浏览 */
 export async function humanScroll(page: Page): Promise<void> {
-  console.log('[humanScroll] 模拟浏览行为...');
+  logger.debug('[humanScroll] 模拟浏览行为...');
 
   const scrollTimes = SAFETY_CONFIG.SCROLL_TIMES_MIN + 
                       Math.floor(Math.random() * (SAFETY_CONFIG.SCROLL_TIMES_MAX - SAFETY_CONFIG.SCROLL_TIMES_MIN + 1));
@@ -150,7 +151,7 @@ export async function loadCookies(page: Page): Promise<boolean> {
   const cookiesData = fs.readFileSync(COOKIES_PATH, 'utf-8');
   const cookies = JSON.parse(cookiesData);
   await page.setCookie(...cookies);
-  console.log(`[loadCookies] 已加载 ${cookies.length} 个 Cookie`);
+  logger.info(`[loadCookies] 已加载 ${cookies.length} 个 Cookie`);
   return true;
 }
 

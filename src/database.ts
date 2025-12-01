@@ -4,6 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { NoteInfo, QuestionItem, SaveResult } from './types';
+import { logger } from './logger';
 
 /** NoteInfo 转 QuestionItem */
 export function noteToQuestionItem(note: NoteInfo): QuestionItem | null {
@@ -52,11 +53,11 @@ export function saveToDatabase(notes: NoteInfo[], dbPath: string): SaveResult {
       const content = fs.readFileSync(dbPath, 'utf-8');
       existingData = JSON.parse(content);
       if (!Array.isArray(existingData)) {
-        console.warn('[saveToDatabase] 数据格式错误，重置为空数组');
+        logger.warn('[saveToDatabase] 数据格式错误，重置为空数组');
         existingData = [];
       }
     } catch {
-      console.warn('[saveToDatabase] 无法读取现有数据，将创建新文件');
+      logger.warn('[saveToDatabase] 无法读取现有数据，将创建新文件');
     }
   }
   
@@ -77,7 +78,7 @@ export function saveToDatabase(notes: NoteInfo[], dbPath: string): SaveResult {
     existingData.push(item);
     existingIds.add(item.id);
     newCount++;
-    console.log(`   ✅ 新增: ${item.title.substring(0, 30)}...`);
+    logger.info(`   ✅ 新增: ${item.title.substring(0, 30)}...`);
   }
   
   fs.writeFileSync(dbPath, JSON.stringify(existingData, null, 2), 'utf-8');

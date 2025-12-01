@@ -4,12 +4,13 @@
 import { AI_CONFIG } from './config';
 import { delay } from './utils';
 import { NoteInfo } from './types';
+import { logger } from './logger';
 
 /** 调用 AI API */
 export async function callAI(prompt: string, systemPrompt?: string): Promise<string> {
   // 检查 API Key 是否配置
   if (!AI_CONFIG.isConfigured) {
-    console.log('   🧠 [AI] ⚠️ 未配置 API Key，跳过 AI 分析');
+    logger.warn('   🧠 [AI] ⚠️ 未配置 API Key，跳过 AI 分析');
     return '';
   }
   
@@ -49,10 +50,10 @@ export async function callAI(prompt: string, systemPrompt?: string): Promise<str
     } catch (error: any) {
       const isLastAttempt = attempt === AI_CONFIG.RETRIES;
       if (isLastAttempt) {
-        console.log(`   🧠 [AI] ⚠️ 调用失败: ${error.message || '网络错误'}`);
+        logger.error(`   🧠 [AI] ⚠️ 调用失败: ${error.message || '网络错误'}`);
         return '';
       }
-      console.log(`   🧠 [AI] 重试 ${attempt + 1}/${AI_CONFIG.RETRIES}...`);
+      logger.warn(`   🧠 [AI] 重试 ${attempt + 1}/${AI_CONFIG.RETRIES}...`);
       await delay(2000);
     }
   }
@@ -65,7 +66,7 @@ export async function generateAIReport(notes: NoteInfo[]): Promise<string> {
     return '今日未采集到有效内容。';
   }
 
-  console.log('[AI] 🧠 正在生成智能分析...');
+  logger.info('[AI] 🧠 正在生成智能分析...');
 
   const noteSummaries = notes.slice(0, 6).map((n, i) => {
     let summary = `【${i + 1}】${n.title}\n`;
@@ -91,11 +92,11 @@ ${noteSummaries}
   try {
     const report = await callAI(prompt);
     if (report) {
-      console.log('[AI] 🧠 ✅ 分析完成');
+      logger.info('[AI] 🧠 ✅ 分析完成');
       return report;
     }
   } catch (error: any) {
-    console.log(`[AI] 🧠 ⚠️ 分析失败: ${error.message || '未知错误'}`);
+    logger.error(`[AI] 🧠 ⚠️ 分析失败: ${error.message || '未知错误'}`);
   }
 
   return `*[AI 分析待补充]*\n\n本次采集了 ${notes.length} 篇笔记，请人工查看 \`data/interview_questions.json\` 进行分析。`;
