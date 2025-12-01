@@ -1,11 +1,10 @@
 /**
  * XHS Intelligence Agent - 情报搜集系统 (Phase 2)
  * 
- * 🔒 v4.1 Security Hardened Edition
+ * 📚 v4.2 Expert Knowledge Base Edition
+ * - 全明星专家词库 (KEYWORD_POOLS)
+ * - 智能混合轮询 (Smart Mix Rotation)
  * - 正文 + 热评双重抓取
- * - 作者主页链接（可点击）
- * - 智能过滤无意义短评
- * - AI 生成情报分析报告
  * - 增量写入 + 去重 (note_id)
  * 
  * 🛡️ 安全加固 (Anti-Detection):
@@ -14,7 +13,6 @@
  * - 关键词间隔 90-180 秒
  * - 随机视口尺寸
  * - 隐藏 webdriver 特征
- * - 偶尔"回看"模拟真人阅读
  */
 
 import puppeteerExtra from 'puppeteer-extra';
@@ -36,24 +34,63 @@ const REPORTS_DIR = path.join(PROJECT_ROOT, 'reports');
 const DATA_DIR = path.join(PROJECT_ROOT, 'data');  // v4.0: AlgoQuest 数据目录
 
 // ============================================================================
-// AI API 配置 (来自 AlgoQuest3)
+// v4.2 全明星专家词库 (Expert Knowledge Base)
 // ============================================================================
-const AI_CONFIG = {
-  API_BASE: 'https://yinli.one/v1',
-  API_KEY: 'sk-6gGjX7JDr35E0TljC8SdNIWoYWpxgIWlUVmSaifLnAnMaa1C',
-  MODEL: 'gemini-2.5-pro',  // 用 pro 版本更智能
+const KEYWORD_POOLS = {
+  // 场景 A: 硬核技术 (搜/广/推/生成式)
+  TECH_CORE: [
+    // 推荐
+    '推荐系统 召回', '双塔模型 负采样', '粗排 精排 策略', '重排 多样性', 
+    'DeepFM 面试', 'MMoE 多目标', 'DIN 模型',
+    // 搜索
+    '搜索算法 面试', '倒排索引 优化', 'Query理解', '语义搜索', 'Elasticsearch 面试',
+    // 广告
+    '广告算法 策略', 'CTR预估 模型', 'OCPC 竞价', '广告召回', '流量分配',
+    // 新趋势
+    '生成式推荐', 'LLM 推荐系统'
+  ],
+
+  // 场景 B: 目标大厂 (覆盖 BAT、TMD 及独角兽)
+  TARGET_COMPANIES: [
+    '字节 算法实习', '美团 搜推面经', '阿里妈妈 面试', '腾讯 广告算法', 
+    '百度 搜索算法', '快手 推荐算法', '小红书 算法实习', '滴滴 算法校招',
+    '京东 推荐搜索', '拼多多 算法', '米哈游 算法', 'Shopee 算法'
+  ],
+
+  // 场景 C: 手撕代码 (高频算法题)
+  CODING_CHALLENGE: [
+    '算法岗 手撕', '推荐系统 代码题', 'LeetCode Hot100', 
+    'Auc 计算 代码', 'IoU 计算 手撕', 'NMS 实现', 'K-Means 手写', 
+    '二叉树 遍历', 'TopK 问题'
+  ],
+
+  // 场景 D: 前沿热点 (大模型/AIGC)
+  HOT_TRENDS: [
+    '大模型 面试', 'DeepSeek 部署', 'Gemini 应用', 'RAG 知识库', 
+    'LangChain 实战', 'Transformer 源码', 'LoRA 微调', 
+    'Prompt Engineering', '大模型 推理加速'
+  ]
 };
 
-// ============================================================================
-// 核心话题配置 (AI 会自动扩展为多个关键词)
-// ============================================================================
-const CORE_TOPIC = '推荐算法/广告算法 面试和实习';
-
-// 备用关键词 (AI 扩展失败时使用) - 只要 2 个
-const FALLBACK_KEYWORDS = [
-  '推荐算法面经',
-  '广告算法实习',
-];
+/**
+ * v4.2 智能混合轮询 - 每次运行随机抽取 3 个关键词
+ * 策略：1 技术 + 1 大厂 + 1 (手撕或热点)
+ */
+function getSmartMixKeywords(): string[] {
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  
+  // 1. 从 TECH_CORE 随机选 1 个
+  const tech = pick(KEYWORD_POOLS.TECH_CORE);
+  
+  // 2. 从 TARGET_COMPANIES 随机选 1 个
+  const company = pick(KEYWORD_POOLS.TARGET_COMPANIES);
+  
+  // 3. 从 CODING_CHALLENGE 和 HOT_TRENDS 混合池随机选 1 个
+  const mixPool = [...KEYWORD_POOLS.CODING_CHALLENGE, ...KEYWORD_POOLS.HOT_TRENDS];
+  const hotOrCode = pick(mixPool);
+  
+  return [tech, company, hotOrCode];
+}
 
 // 内容摘要长度
 const CONTENT_SUMMARY_LENGTH = 500;
@@ -473,128 +510,6 @@ function makeSearchURL(keyword: string): string {
     source: 'web_explore_feed',
   });
   return `https://www.xiaohongshu.com/search_result?${params.toString()}`;
-}
-
-// ============================================================================
-// AI FUNCTIONS - 智能关键词扩展 & 报告生成
-// ============================================================================
-
-/**
- * 调用 AI API (带超时和重试)
- */
-async function callAI(prompt: string, systemPrompt?: string, retries: number = 2): Promise<string> {
-  const messages = [
-    ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-    { role: 'user', content: prompt }
-  ];
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      // 创建 AbortController 用于超时控制
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-
-      const response = await fetch(`${AI_CONFIG.API_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${AI_CONFIG.API_KEY}`
-        },
-        body: JSON.stringify({
-          model: AI_CONFIG.MODEL,
-          messages,
-          stream: false
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`API ${response.status}: ${errorText.substring(0, 100)}`);
-      }
-
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || '';
-    } catch (error: any) {
-      const isLastAttempt = attempt === retries;
-      if (isLastAttempt) {
-        throw error;
-      }
-      console.log(`   [AI] 重试 ${attempt + 1}/${retries}...`);
-      await delay(2000); // 等待2秒后重试
-    }
-  }
-  throw new Error('AI 调用失败');
-}
-
-/**
- * AI 扩展关键词 (基于核心话题) - 只生成 2 个
- */
-async function expandKeywords(topic: string): Promise<string[]> {
-  console.log('[AI] 🤖 正在智能扩展关键词...');
-  
-  try {
-    const prompt = `你是一个小红书搜索专家。用户想搜索关于"${topic}"的内容。
-
-请生成 2 个最有效的小红书搜索关键词，要求：
-1. 符合小红书用户的搜索习惯 (口语化、场景化)
-2. 避免太专业或太宽泛的词
-3. 能找到真实的面经分享或经验帖
-
-直接返回 2 个关键词，每行一个，不要编号或其他内容。`;
-
-    const result = await callAI(prompt);
-    const keywords = result.split('\n')
-      .map(k => k.trim())
-      .filter(k => k.length > 0 && k.length < 20);
-
-    if (keywords.length >= 2) {
-      console.log(`[AI] ✅ 生成关键词: ${keywords.join(', ')}`);
-      return keywords.slice(0, 2);
-    }
-  } catch (error: any) {
-    console.warn(`[AI] ⚠️ 关键词扩展失败: ${error.message || error}`);
-  }
-
-  return FALLBACK_KEYWORDS;
-}
-
-/**
- * AI 生成智能报告摘要
- */
-async function generateAIReport(notes: NoteInfo[]): Promise<string> {
-  if (notes.length === 0) {
-    return '今日未采集到有效内容。';
-  }
-
-  console.log('[AI] 🤖 正在生成智能报告...');
-
-  // 构建笔记摘要 (限制长度避免 token 过多)
-  const noteSummaries = notes.slice(0, 8).map((n, i) => 
-    `【${i + 1}】${n.title}\n内容: ${n.content.substring(0, 150)}`
-  ).join('\n\n');
-
-  const prompt = `分析以下 ${notes.length} 篇小红书笔记，生成简洁报告：
-
-${noteSummaries}
-
-请用 Markdown 格式输出：
-1. **核心洞察** (3个要点)
-2. **面试热点** (如有)
-3. **行动建议** (2条)
-
-控制在 300 字以内。`;
-
-  try {
-    const report = await callAI(prompt);
-    console.log('[AI] ✅ 报告生成完成');
-    return report;
-  } catch (error: any) {
-    console.warn(`[AI] ⚠️ 报告生成失败: ${error.message || error}`);
-    return `(AI 报告生成失败: ${error.message || '未知错误'}，请查看原始内容)`;
-  }
 }
 
 // 已读笔记标题集合 (用于去重)
@@ -1548,7 +1463,7 @@ function generateDailyReport(allNotes: NoteInfo[]): string {
 
   let report = `# 📅 ${today} 搜广推情报日报\n\n`;
   report += `> 🕐 生成时间: ${new Date().toLocaleTimeString('zh-CN')}\n`;
-  report += `> 🗃️ v4.1 Database Ready Edition - 正文 + 热评 + 增量去重\n`;
+  report += `> 📚 v4.2 Expert Knowledge Base Edition - 技术+大厂+热点 智能混合\n`;
   report += `> 📊 共收录 ${allNotes.length} 篇笔记\n\n`;
   report += `---\n\n`;
 
@@ -1603,13 +1518,13 @@ function generateDailyReport(allNotes: NoteInfo[]): string {
   report += `3. **拆题输出**: 用"实习生拆题"模板，针对评论区问题展开\n`;
   report += `4. **发布**: 运行 \`npx tsx publisher.ts\` 发布你的拆解\n\n`;
   report += `---\n`;
-  report += `_Generated by XHS Intelligence Agent v4.1 (Database Ready Edition)_\n`;
+  report += `_Generated by XHS Intelligence Agent v4.2 (Expert Knowledge Base Edition)_\n`;
 
   return report;
 }
 
 // ============================================================================
-// AlgoQuest 生态联动 - JSON 数据导出 (v4.1 Database Ready)
+// AlgoQuest 生态联动 - JSON 数据导出 (v4.2 Expert Knowledge Base)
 // ============================================================================
 
 /**
@@ -1739,17 +1654,15 @@ function saveToDatabase(allNotes: NoteInfo[], dbPath: string): {
 }
 
 // ============================================================================
-// MAIN - 主程序 (v4.1 Database Ready Edition)
+// MAIN - 主程序 (v4.2 Expert Knowledge Base Edition)
 // ============================================================================
 
 async function main(): Promise<void> {
   console.log('╔════════════════════════════════════════╗');
   console.log('║  XHS Intelligence - 情报搜集系统       ║');
-  console.log('║  � v4.1 Security Hardened Edition     ║');
-  console.log('║  �️ 贝塞尔鼠标 + 变速打字 + 慢用户    ║');
+  console.log('║  📚 v4.2 Expert Knowledge Base Edition ║');
+  console.log('║  🎯 技术+大厂+热点 智能混合轮询       ║');
   console.log('╚════════════════════════════════════════╝');
-  console.log();
-  console.log(`🎯 核心话题: ${CORE_TOPIC}`);
   console.log();
 
   let browser: Browser | null = null;
@@ -1835,15 +1748,18 @@ async function main(): Promise<void> {
     console.log('[main] ✅ 登录状态正常，开始搜集情报...');
     console.log();
 
-    // Step 4: AI 扩展关键词
-    console.log('[main] Step 4: AI 智能扩展关键词...');
-    const keywords = await expandKeywords(CORE_TOPIC);
-    console.log(`[main] 📋 将搜索: ${keywords.join(', ')}`);
+    // Step 4: v4.2 智能混合轮询 - 从专家词库随机抽取
+    console.log('[main] Step 4: 智能混合轮询 (Smart Mix Rotation)...');
+    const keywords = getSmartMixKeywords();
+    console.log('[main] 📋 本次关键词组合:');
+    console.log(`   🔧 技术: ${keywords[0]}`);
+    console.log(`   🏢 大厂: ${keywords[1]}`);
+    console.log(`   🔥 热点: ${keywords[2]}`);
     console.log();
 
     // Step 5: 真人模式搜集
     console.log('[main] Step 5: 开始真人模式搜集...');
-    console.log(`[main] 流程: ${keywords.length}个关键词 × 随机3篇 → 最后刷1篇Feed`);
+    console.log(`[main] 流程: 3个关键词 × 随机3篇 → 最后刷1篇Feed`);
 
     const allNotes: NoteInfo[] = [];
 
@@ -1897,27 +1813,20 @@ async function main(): Promise<void> {
       fs.mkdirSync(REPORTS_DIR, { recursive: true });
     }
 
-    // 生成基础报告
+    // 生成日报
     const report = generateDailyReport(allNotes);
-    
-    // Step 7: AI 智能总结
-    console.log('[main] Step 7: AI 生成智能分析...');
-    const aiSummary = await generateAIReport(allNotes);
-    
-    // 合并报告
-    const fullReport = report + '\n\n---\n\n## 🤖 AI 智能分析\n\n' + aiSummary;
 
     const reportFileName = `daily_trends_${new Date().toISOString().split('T')[0]}.md`;
     const reportPath = path.join(REPORTS_DIR, reportFileName);
 
-    fs.writeFileSync(reportPath, fullReport, 'utf-8');
+    fs.writeFileSync(reportPath, report, 'utf-8');
 
     // 同时保存到固定文件名
     const latestPath = path.join(REPORTS_DIR, 'daily_trends.md');
-    fs.writeFileSync(latestPath, fullReport, 'utf-8');
+    fs.writeFileSync(latestPath, report, 'utf-8');
 
-    // Step 8: v4.1 增量保存到 AlgoQuest 数据库
-    console.log('[main] Step 8: 保存到 AlgoQuest 数据库 (增量去重)...');
+    // Step 7: 增量保存到 AlgoQuest 数据库
+    console.log('[main] Step 7: 保存到 AlgoQuest 数据库 (增量去重)...');
     
     // 确保 data 目录存在
     if (!fs.existsSync(DATA_DIR)) {
@@ -1930,12 +1839,11 @@ async function main(): Promise<void> {
 
     console.log();
     console.log('╔════════════════════════════════════════╗');
-    console.log('║   ✅ v4.1 情报搜集完成！               ║');
+    console.log('║   ✅ v4.2 情报搜集完成！               ║');
     console.log('╚════════════════════════════════════════╝');
     console.log();
     console.log(`  📊 共阅读: ${allNotes.length} 篇有效笔记`);
     console.log(`  💬 已提取社区热评`);
-    console.log(`  🤖 已生成 AI 智能分析`);
     console.log(`  📁 日报: ${reportPath}`);
     console.log();
     console.log(`  🎯 AlgoQuest 数据库更新:`);
@@ -1944,6 +1852,7 @@ async function main(): Promise<void> {
     console.log(`     - 总计: ${saveResult.total} 道题`);
     console.log(`     - 路径: ${dbPath}`);
     console.log();
+    console.log('  📚 v4.2 专家词库: 技术+大厂+热点 智能混合');
     console.log('  💡 数据库使用 note_id 去重，可放心重复运行！');
 
   } catch (error) {
