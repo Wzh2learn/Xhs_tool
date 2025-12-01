@@ -1,6 +1,6 @@
 # 📋 每日运营剧本 (Daily SOP)
 
-> **v4.1 Security & Database Edition** - 账号安全与数据资产并重
+> **🚀 v5.0 Ultimate Edition** - OCR + 看图 + AI 分析
 > 
 > 这是你每天早上工作的**唯一指南**。按顺序执行，不要跳步。
 
@@ -18,16 +18,18 @@ npx tsx index.ts
 ### 产出
 
 - **日报文件**: `reports/daily_trends.md`
-- **题库文件**: `data/interview_questions.json` 🆕
-- **内容**: 2 个关键词 × 3 篇笔记 + 1 篇 Feed 推荐 = **7 篇笔记**
+- **题库文件**: `data/interview_questions.json`
+- **内容**: 3 个关键词 × 3 篇笔记 + 1 篇 Feed 推荐 = **10 篇笔记**
 - **每篇包含**: 
   - 标题、作者、点赞数、标签
   - **📝 正文全文** (`full_text`)
+  - **👁️ OCR 图片文字** (正文 < 50 字时自动识别)
   - **💬 Top 5 热评** (`hot_comments`)
+  - **🧠 AI 智能分析** (提取核心面试题)
 
 ### 耗时
 
-约 **15-20 分钟**（v4.1 慢用户模式，保护账号安全）
+约 **15-20 分钟**（v5.0 慢用户模式 + 拟人化看图）
 
 ### 🎯 心态
 
@@ -196,6 +198,36 @@ npx tsx publisher.ts
 | Cookie 过期 | `npx tsx login.ts` |
 | 搜集情报 | `npx tsx index.ts` |
 | 发布笔记 | `npx tsx publisher.ts` |
+| 测试 v5.0 功能 | `npx tsx test_v5_features.ts` |
+
+---
+
+## ⚙️ v5.0 新功能配置
+
+### 环境变量 (可选)
+
+```bash
+# 复制模板
+cp .env.example .env
+```
+
+编辑 `.env` 文件：
+```env
+AI_API_BASE=https://api.openai.com/v1
+AI_API_KEY=sk-your-api-key
+AI_MODEL=gpt-3.5-turbo
+```
+
+> 💡 不配置也能运行，会使用默认 API
+
+### v5.0 新增功能
+
+| 功能 | 说明 | 触发条件 |
+|------|------|---------|
+| 👁️ OCR 图片识别 | 自动识别图片中的文字 | 正文 < 50 字 |
+| 🖐️ 拟人化看图 | 模拟翻看 2-4 张图片 | 每篇笔记 |
+| 🧠 AI 智能分析 | 提取核心面试题 + 技术热点 | 每次运行 |
+| 📚 专家词库 | 49 个精选关键词 | 智能混合轮询 |
 
 ---
 
@@ -251,12 +283,17 @@ npx tsx publisher.ts
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     每日运营闭环                          │
+│                   v5.0 每日运营闭环                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   🔍 小红书热门面经                                       │
 │          ↓                                                  │
+│   📚 专家词库 (49关键词) → 智能混合轮询                   │
+│          ↓                                                  │
 │   🤖 index.ts 自动抓取 (15-20min)                         │
+│       ├─ 👁️ OCR 图片识别 (正文<50字)                      │
+│       ├─ 🖐️ 拟人化看图 (2-4张)                            │
+│       └─ 🧠 AI 智能分析                                   │
 │          ↓                                                  │
 │   🗄️ interview_questions.json (增量去重)                  │
 │          ↓                                                  │
@@ -273,4 +310,4 @@ npx tsx publisher.ts
 
 ---
 
-*Last Updated: 2025-11-30 (v4.1 Security & Database Edition)*
+*Last Updated: 2025-12-02 (v5.0 Ultimate Edition)*
