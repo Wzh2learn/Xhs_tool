@@ -1,41 +1,15 @@
 /**
- * XHS Intelligence Agent - 情报搜集系统 (Phase 2)
- * 
- * 🚀 v5.0 Ultimate Edition (Defensive Hardened)
- * - 👁️ OCR 图片识别 (tesseract.js) + 10s 超时保护
- * - 🖐️ 拟人化看图 (模拟翻页) + 通用选择器
- * - 🧠 AI 智能分析 (容错增强)
- * - 📚 全明星专家词库 + 智能混合轮询
- * - 增量写入 + 去重 (note_id)
- * 
- * 🛡️ 安全加固 (Anti-Detection):
- * - 贝塞尔曲线鼠标轨迹
- * - 变速打字 (80-200ms/字)
- * - 关键词间隔 90-180 秒
- * - 随机视口尺寸
- * - 隐藏 webdriver 特征
- * 
- * 🛡️ 防御性编程 (Defensive Coding):
- * - OCR 10 秒超时保护
- * - 翻页按钮多级回退
- * - 环境变量 dotenv 支持
- * - OCR 与看图并行执行
+ * XHS Intelligence Agent v5.0 - 情报搜集系统
+ * @see README.md 完整功能说明
  */
-
-// 加载环境变量 (从 .env 文件)
 import 'dotenv/config';
 
-// 🛡️ 全局错误处理 (防止 tesseract.js Worker 异常导致崩溃)
-process.on('unhandledRejection', (reason, promise) => {
-  console.log('   ⚠️ [全局] 未捕获的 Promise 拒绝，已忽略:', String(reason).substring(0, 50));
+// 全局错误处理 (防 OCR Worker 崩溃)
+process.on('unhandledRejection', (reason) => {
+  console.log('   ⚠️ [全局] Promise 拒绝:', String(reason).substring(0, 50));
 });
 process.on('uncaughtException', (error) => {
-  // 只忽略 OCR 相关的 fetch 错误
-  if (error.message?.includes('fetch failed')) {
-    console.log('   ⚠️ [OCR] 网络错误，已忽略');
-    return;
-  }
-  // 其他错误正常抛出
+  if (error.message?.includes('fetch failed')) return;
   throw error;
 });
 
@@ -46,69 +20,48 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Tesseract from 'tesseract.js';
 
-// 启用 Stealth 插件 (防检测)
 puppeteerExtra.use(StealthPlugin());
 
-// ============================================================================
-// CONFIGURATION - 配置
-// ============================================================================
-
+// === 配置 ===
 const PROJECT_ROOT = 'd:/AIlearn/xhs_automation';
 const COOKIES_PATH = path.join(PROJECT_ROOT, 'xhs_cookies.json');
 const REPORTS_DIR = path.join(PROJECT_ROOT, 'reports');
-const DATA_DIR = path.join(PROJECT_ROOT, 'data');  // v4.0: AlgoQuest 数据目录
+const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 
-// ============================================================================
-// v5.0 AI API 配置 (可自定义代理)
-// ============================================================================
 const AI_CONFIG = {
   API_BASE: process.env.AI_API_BASE || 'https://yinli.one/v1',
   API_KEY: process.env.AI_API_KEY || 'sk-6gGjX7JDr35E0TljC8SdNIWoYWpxgIWlUVmSaifLnAnMaa1C',
-  MODEL: process.env.AI_MODEL || 'gemini-2.5-flash',  // flash 更快更稳
-  TIMEOUT: 30000,  // 30秒超时
-  RETRIES: 2,      // 重试次数
+  MODEL: process.env.AI_MODEL || 'gemini-2.5-flash',
+  TIMEOUT: 30000,
+  RETRIES: 2,
 };
 
-// OCR 配置 (防御性增强)
 const OCR_CONFIG = {
-  MIN_CONTENT_LENGTH: 50,  // 正文少于50字时触发 OCR
-  MAX_IMAGES: 3,           // 最多识别前3张图
-  LANG: 'chi_sim+eng',     // 中英文混合识别
-  TIMEOUT: 10000,          // 单张图 10 秒超时 (防卡死)
+  MIN_CONTENT_LENGTH: 50,
+  MAX_IMAGES: 3,
+  LANG: 'chi_sim+eng',
+  TIMEOUT: 10000,
 };
 
-// ============================================================================
-// v5.0 全明星专家词库 (Expert Knowledge Base)
-// ============================================================================
+// === 专家词库 ===
 const KEYWORD_POOLS = {
-  // 场景 A: 硬核技术 (搜/广/推/生成式)
   TECH_CORE: [
-    // 推荐
     '推荐系统 召回', '双塔模型 负采样', '粗排 精排 策略', '重排 多样性', 
     'DeepFM 面试', 'MMoE 多目标', 'DIN 模型',
-    // 搜索
     '搜索算法 面试', '倒排索引 优化', 'Query理解', '语义搜索', 'Elasticsearch 面试',
-    // 广告
     '广告算法 策略', 'CTR预估 模型', 'OCPC 竞价', '广告召回', '流量分配',
-    // 新趋势
     '生成式推荐', 'LLM 推荐系统'
   ],
-
-  // 场景 B: 目标大厂 (覆盖 BAT、TMD 及独角兽)
   TARGET_COMPANIES: [
     '字节 算法实习', '美团 搜推面经', '阿里妈妈 面试', '腾讯 广告算法', 
     '百度 搜索算法', '快手 推荐算法', '小红书 算法实习', '滴滴 算法校招',
     '京东 推荐搜索', '拼多多 算法', '米哈游 算法', 'Shopee 算法'
   ],
-
-  // 场景 C: 手撕代码 (高频算法题)
   CODING_CHALLENGE: [
     '算法岗 手撕', '推荐系统 代码题', 'LeetCode Hot100', 
     'Auc 计算 代码', 'IoU 计算 手撕', 'NMS 实现', 'K-Means 手写', 
     '二叉树 遍历', 'TopK 问题'
   ],
-
-  // 场景 D: 前沿热点 (大模型/AIGC)
   HOT_TRENDS: [
     '大模型 面试', 'DeepSeek 部署', 'Gemini 应用', 'RAG 知识库', 
     'LangChain 实战', 'Transformer 源码', 'LoRA 微调', 
@@ -116,24 +69,11 @@ const KEYWORD_POOLS = {
   ]
 };
 
-/**
- * v4.2 智能混合轮询 - 每次运行随机抽取 3 个关键词
- * 策略：1 技术 + 1 大厂 + 1 (手撕或热点)
- */
+/** 智能混合轮询: 1技术 + 1大厂 + 1热点 */
 function getSmartMixKeywords(): string[] {
   const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-  
-  // 1. 从 TECH_CORE 随机选 1 个
-  const tech = pick(KEYWORD_POOLS.TECH_CORE);
-  
-  // 2. 从 TARGET_COMPANIES 随机选 1 个
-  const company = pick(KEYWORD_POOLS.TARGET_COMPANIES);
-  
-  // 3. 从 CODING_CHALLENGE 和 HOT_TRENDS 混合池随机选 1 个
   const mixPool = [...KEYWORD_POOLS.CODING_CHALLENGE, ...KEYWORD_POOLS.HOT_TRENDS];
-  const hotOrCode = pick(mixPool);
-  
-  return [tech, company, hotOrCode];
+  return [pick(KEYWORD_POOLS.TECH_CORE), pick(KEYWORD_POOLS.TARGET_COMPANIES), pick(mixPool)];
 }
 
 // 内容摘要长度
