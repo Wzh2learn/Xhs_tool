@@ -267,11 +267,12 @@ d:\AIlearn\xhs_automation\error_screenshot.png
 
 | 文件 | 用途 |
 |------|------|
-| `login.ts` | 登录工具 (主站扫码) |
 | `index.ts` | 情报系统主程序 |
+| `login.ts` | 登录工具 (主站扫码) |
 | `publisher.ts` | 发布工具 |
 | `test_all.ts` | 完整功能测试 (43项) |
 | `.env.example` | 环境变量模板 |
+| **[ARCHITECTURE.md](ARCHITECTURE.md)** | **🏗️ 技术架构文档** |
 
 ### 📦 模块化结构 (`src/`)
 
