@@ -18,11 +18,21 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page, Browser } from 'puppeteer';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// TODO: 逐步迁移到模块化导入，目前仍使用本地定义
+// import { PROJECT_ROOT, REPORTS_DIR, DATA_DIR, SAFETY_CONFIG, OCR_CONFIG } from './src/config';
+// import { NoteInfo, CommentInfo } from './src/types';
+// import { DETAIL_SELECTORS, NOTE_SELECTORS } from './src/selectors';
+// import { delay, randomDelay, humanClick, humanScroll, loadCookies } from './src/utils';
+// import { extractOCRFromImages, humanViewImages } from './src/ocr';
+// import { generateAIReport } from './src/ai';
+// import { saveToDatabase } from './src/database';
+
 import Tesseract from 'tesseract.js';
 
 puppeteerExtra.use(StealthPlugin());
 
-// === 配置 ===
+// === 配置 (已抽取到 src/config.ts，保留此处兼容) ===
 const PROJECT_ROOT = 'd:/AIlearn/xhs_automation';
 const COOKIES_PATH = path.join(PROJECT_ROOT, 'xhs_cookies.json');
 const REPORTS_DIR = path.join(PROJECT_ROOT, 'reports');

@@ -151,22 +151,23 @@ npx tsx publisher.ts
 
 ```
 d:\AIlearn\xhs_automation\
+├── src/                  # 模块化代码
+│   ├── config.ts         # 配置常量
+│   ├── types.ts          # 类型定义
+│   ├── selectors.ts      # DOM 选择器
+│   ├── utils.ts          # 通用工具函数
+│   ├── ocr.ts            # OCR 图片识别
+│   ├── ai.ts             # AI 智能分析
+│   └── database.ts       # 数据库操作
 ├── content/
 │   ├── drafts/           # 待发布 (放这里)
-│   │   ├── note1.md
-│   │   └── note1.jpg     # 必须同名!
 │   └── published/        # 已发布 (自动归档)
-├── reports/
-│   └── daily_trends.md   # 每日情报日报
+├── reports/              # 每日情报日报
 ├── data/                 # AlgoQuest 本地题库
-│   └── interview_questions.json  # 增量去重 + 状态管理
-├── xhs_cookies.json      # 登录凭证
-├── .env                  # 环境变量 (API 配置)
-├── .env.example          # 环境变量模板
-├── login.ts              # 登录工具 (v3 主站扫码)
-├── index.ts              # 情报搜集 (v5.0 Ultimate)
-├── publisher.ts          # 发布工具 (v4.1 安全加固版)
-└── test_v5_features.ts   # v5.0 功能单元测试
+├── index.ts              # 情报搜集主程序
+├── publisher.ts          # 发布工具
+├── login.ts              # 登录工具
+└── .env.example          # 环境变量模板
 ```
 
 ### Markdown 模板
