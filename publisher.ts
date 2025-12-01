@@ -143,7 +143,7 @@ async function findTextboxByPlaceholder(page: Page): Promise<ElementHandle<Eleme
     }, placeholderElem);
 
     // 检查是否找到了有效的 textbox
-    const element = textbox.asElement();
+    const element = textbox.asElement() as ElementHandle<Element> | null;
     if (element) {
       return element;
     }
@@ -423,7 +423,7 @@ export async function publishNote(page: Page, draft: Draft): Promise<void> {
     throw new Error('未找到图片上传输入框');
   }
   // Puppeteer 的 uploadFile 直接支持本地文件路径
-  await uploadInput.uploadFile(...draft.imagePaths);
+  await (uploadInput as ElementHandle<HTMLInputElement>).uploadFile(...draft.imagePaths);
 
   // Step 4: 等待上传完成 (publish.go:60-62 调用 uploadImages)
   console.log('[publishNote] Step 4: 等待图片上传完成...');
