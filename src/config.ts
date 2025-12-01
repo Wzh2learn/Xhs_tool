@@ -2,14 +2,23 @@
  * 项目配置常量
  */
 import * as path from 'path';
+import * as fs from 'fs';
 
-// === 项目路径 ===
-export const PROJECT_ROOT = 'd:/AIlearn/xhs_automation';
+// === 项目路径 (动态获取) ===
+// 优先使用环境变量，否则使用当前工作目录
+export const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
 export const COOKIES_PATH = path.join(PROJECT_ROOT, 'xhs_cookies.json');
 export const REPORTS_DIR = path.join(PROJECT_ROOT, 'reports');
 export const DATA_DIR = path.join(PROJECT_ROOT, 'data');
 export const DRAFTS_DIR = path.join(PROJECT_ROOT, 'content/drafts');
 export const PUBLISHED_DIR = path.join(PROJECT_ROOT, 'content/published');
+
+// 确保必要目录存在
+[REPORTS_DIR, DATA_DIR, DRAFTS_DIR, PUBLISHED_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
 // === AI API 配置 ===
 // ⚠️ API Key 必须通过环境变量配置，不在代码中硬编码

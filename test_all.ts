@@ -257,10 +257,11 @@ async function runTests() {
   test('导出 ocr', () => typeof src.extractOCRFromImages === 'function');
   test('导出 ai', () => typeof src.callAI === 'function');
   test('导出 database', () => typeof src.saveToDatabase === 'function');
+  test('导出 logger', () => typeof src.Logger === 'function');
 
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
   // 汇总
-  // ═══════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
   console.log('\n════════════════════════════════════════');
   console.log(`  总计: ${passed + failed} 项测试`);
   console.log(`  ✅ 通过: ${passed}`);

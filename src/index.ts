@@ -22,3 +22,6 @@ export * from './ai';
 
 // 数据库
 export * from './database';
+
+// 日志
+export * from './logger';

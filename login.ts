@@ -67,7 +67,9 @@ async function isLoggedIn(page: Page): Promise<boolean> {
           return false; // 发现登录弹窗，说明未登录
         }
       }
-    } catch {}
+    } catch (e) {
+      // 元素不可见或选择器不存在，继续下一个
+    }
   }
 
   // 方式2: 检查登录成功的元素标识
@@ -83,7 +85,9 @@ async function isLoggedIn(page: Page): Promise<boolean> {
           return true; // 发现已登录元素
         }
       }
-    } catch {}
+    } catch (e) {
+      // 元素不可见或选择器不存在，继续下一个
+    }
   }
 
   // 方式3: 检查页面是否有用户头像 (img src 包含 avatar 或 user)
@@ -104,7 +108,9 @@ async function isLoggedIn(page: Page): Promise<boolean> {
     if (hasAvatar) {
       return true;
     }
-  } catch {}
+  } catch (e) {
+    // 头像检查失败，视为未登录
+  }
 
   return false;
 }
@@ -133,7 +139,9 @@ async function getNickname(page: Page): Promise<string | null> {
     if (title && !title.includes('登录') && title.length < 50) {
       return `(from title: ${title})`;
     }
-  } catch {}
+  } catch (e) {
+    // 无法获取昵称，返回 null
+  }
 
   return null;
 }
