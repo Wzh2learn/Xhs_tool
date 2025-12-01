@@ -1,35 +1,21 @@
 /**
  * XHS Login Utility - 小红书主站登录与 Cookie 保存
- * 
- * ⚠️ 重要：本脚本登录的是【主站】www.xiaohongshu.com
- * 获取的 Cookie 是根域名 .xiaohongshu.com 的，可用于：
- *   - index.ts (情报搜集 - 主站浏览)
- *   - publisher.ts (发布笔记 - 创作中心)
- * 
- * 一把钥匙开两把锁！🔑
- * 
- * v3.0 更新：
- * - 登录目标改为主站 (www.xiaohongshu.com)
- * - 检测主站登录态元素
- * - Cookie 全站通用
+ * @see README.md
  */
-
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page, Browser } from 'puppeteer';
 import * as fs from 'fs';
-import * as path from 'path';
 
-// 启用 Stealth 插件 (防检测)
+// 从模块导入
+import { COOKIES_PATH } from './src/config';
+import { delay } from './src/utils';
+
 puppeteerExtra.use(StealthPlugin());
 
-// 配置
-const PROJECT_ROOT = 'd:/AIlearn/xhs_automation';
-const COOKIES_PATH = path.join(PROJECT_ROOT, 'xhs_cookies.json');
-
-// ✅ 主站 URL (不是 creator 子站!)
+// 登录专用配置
 const MAIN_SITE_URL = 'https://www.xiaohongshu.com';
-const LOGIN_TIMEOUT_MS = 180_000;  // 3 分钟 = 180 秒
+const LOGIN_TIMEOUT_MS = 180_000;
 
 // 主站登录成功的标识 (任意一个匹配即可)
 const LOGIN_SUCCESS_INDICATORS = [
@@ -63,16 +49,9 @@ const NICKNAME_SELECTORS = [
   '[class*="user-name"]',
 ];
 
-/**
- * 延时函数
- */
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// delay 函数已从 src/utils 导入
 
-/**
- * 检测是否已登录 (主站版本)
- */
+/** 检测是否已登录 (主站版本) */
 async function isLoggedIn(page: Page): Promise<boolean> {
   // 方式1: 检查是否存在未登录标识 (如果有登录弹窗/二维码，说明未登录)
   for (const selector of NOT_LOGGED_IN_INDICATORS) {

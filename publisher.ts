@@ -1,62 +1,23 @@
 /**
- * XHS Publisher - Phase 3: 发布系统
- * 基于 xiaohongshu-mcp (Go) 源码审计，使用 Puppeteer (TS) 重写
- * 
- * 源码参考: https://github.com/xpzouying/xiaohongshu-mcp
+ * XHS Publisher - 发布系统
+ * @see README.md
  */
-
 import puppeteer, { Page, ElementHandle, Browser } from 'puppeteer';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// 启用 Stealth 插件 (防检测)
+// 从模块导入
+import { COOKIES_PATH, DRAFTS_DIR, PUBLISHED_DIR, PROJECT_ROOT } from './src/config';
+import { PUBLISH_SELECTORS } from './src/selectors';
+import { Draft } from './src/types';
+import { delay } from './src/utils';
+
 puppeteerExtra.use(StealthPlugin());
 
-// ============================================================================
-// SELECTORS - 从 Go 源码提取的"黄金数据"
-// ============================================================================
-
-export const SELECTORS = {
-  // 发布页 URL (publish.go:31)
-  PUBLISH_URL: 'https://creator.xiaohongshu.com/publish/publish?source=official',
-
-  // 页面容器 (publish.go:101)
-  UPLOAD_CONTAINER: 'div.upload-content',
-
-  // Tab 按钮 (publish.go:137) - 需匹配文本 "上传图文" 或 "上传视频"
-  TAB_BUTTON: 'div.creator-tab',
-
-  // 图片上传 (publish.go:202)
-  UPLOAD_INPUT: '.upload-input',
-
-  // 上传完成验证 (publish.go:221) - 每个已上传图片会有一个 .pr 元素
-  UPLOAD_COMPLETE_ITEM: '.img-preview-area .pr',
-
-  // 标题输入框 (publish.go:244)
-  TITLE_INPUT: 'div.d-input input',
-
-  // 正文输入框 - 双策略 (publish.go:269-292)
-  CONTENT_EDITOR_V1: 'div.ql-editor',  // Quill 编辑器
-  CONTENT_EDITOR_V2_PLACEHOLDER: 'p[data-placeholder*="输入正文描述"]',  // 备选方案
-
-  // 标签联想 (publish.go:333-337)
-  TAG_CONTAINER: '#creator-editor-topic-container',
-  TAG_ITEM: '#creator-editor-topic-container .item',
-
-  // 发布按钮 (publish.go:260)
-  SUBMIT_BUTTON: 'div.submit div.d-button-content',
-
-  // 弹窗遮挡层 (publish.go:82)
-  POPOVER: 'div.d-popover',
-} as const;
-
-// === 辅助函数 ===
-
-export function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// 选择器别名 (兼容旧代码)
+const SELECTORS = PUBLISH_SELECTORS
 
 /** 移除弹窗遮挡层 (publish.go:79-98) */
 export async function removePopCover(page: Page): Promise<void> {
@@ -263,14 +224,7 @@ export async function clickPublishTab(page: Page, tabName: string): Promise<void
   throw new Error(`没有找到发布 Tab: "${tabName}"`);
 }
 
-// === 类型定义 ===
-
-export interface Draft {
-  title: string;        // 标题 (最大40单位长度)
-  content: string;      // 正文内容
-  tags: string[];       // 标签列表 (最多10个)
-  imagePaths: string[]; // 本地图片路径列表
-}
+// Draft 类型已从 src/types 导入
 
 // === 内容格式化 ===
 
@@ -511,10 +465,7 @@ export async function publishNote(page: Page, draft: Draft): Promise<void> {
 }
 
 // === Markdown 解析 ===
-const PROJECT_ROOT = 'd:/AIlearn/xhs_automation';
-const DRAFTS_DIR = path.join(PROJECT_ROOT, 'content/drafts');
-const PUBLISHED_DIR = path.join(PROJECT_ROOT, 'content/published');
-const COOKIES_PATH = path.join(PROJECT_ROOT, 'xhs_cookies.json');
+// 路径常量已从 src/config 导入
 
 /** 解析 Markdown 文件为 Draft 对象 */
 export function parseMarkdown(mdFilePath: string): Draft {
