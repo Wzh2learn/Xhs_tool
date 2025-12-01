@@ -12,12 +12,16 @@ export const DRAFTS_DIR = path.join(PROJECT_ROOT, 'content/drafts');
 export const PUBLISHED_DIR = path.join(PROJECT_ROOT, 'content/published');
 
 // === AI API 配置 ===
+// ⚠️ API Key 必须通过环境变量配置，不在代码中硬编码
 export const AI_CONFIG = {
   API_BASE: process.env.AI_API_BASE || 'https://yinli.one/v1',
-  API_KEY: process.env.AI_API_KEY || 'sk-6gGjX7JDr35E0TljC8SdNIWoYWpxgIWlUVmSaifLnAnMaa1C',
+  API_KEY: process.env.AI_API_KEY || '',  // 必须在 .env 中配置
   MODEL: process.env.AI_MODEL || 'gemini-2.5-flash',
   TIMEOUT: 30000,
   RETRIES: 2,
+  get isConfigured(): boolean {
+    return !!this.API_KEY;
+  }
 };
 
 // === OCR 配置 ===

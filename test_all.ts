@@ -45,12 +45,13 @@ async function runTests() {
   test('DRAFTS_DIR 路径正确', () => config.DRAFTS_DIR.includes('drafts'));
   test('PUBLISHED_DIR 路径正确', () => config.PUBLISHED_DIR.includes('published'));
   
-  test('AI_CONFIG 完整', () => 
+  test('AI_CONFIG 结构完整', () => 
     !!config.AI_CONFIG.API_BASE && 
-    !!config.AI_CONFIG.API_KEY && 
+    typeof config.AI_CONFIG.API_KEY === 'string' &&  // API_KEY 可为空，但必须是字符串
     !!config.AI_CONFIG.MODEL &&
     config.AI_CONFIG.TIMEOUT > 0 &&
-    config.AI_CONFIG.RETRIES >= 0
+    config.AI_CONFIG.RETRIES >= 0 &&
+    typeof config.AI_CONFIG.isConfigured === 'boolean'  // 新增配置检查
   );
   
   test('OCR_CONFIG 完整', () =>

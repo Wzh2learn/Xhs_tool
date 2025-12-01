@@ -57,7 +57,7 @@ export async function humanMouseMove(page: Page, targetX: number, targetY: numbe
 }
 
 /** 模拟人类点击 */
-export async function humanClick(page: Page, element: any): Promise<void> {
+export async function humanClick(page: Page, element: { boundingBox: () => Promise<{ x: number; y: number; width: number; height: number } | null>; click: () => Promise<void> }): Promise<void> {
   try {
     const box = await element.boundingBox();
     if (!box) {

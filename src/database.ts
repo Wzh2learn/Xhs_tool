@@ -2,6 +2,7 @@
  * 数据库操作模块 (JSON 文件存储)
  */
 import * as fs from 'fs';
+import * as path from 'path';
 import { NoteInfo, QuestionItem, SaveResult } from './types';
 
 /** NoteInfo 转 QuestionItem */
@@ -38,12 +39,22 @@ export function noteToQuestionItem(note: NoteInfo): QuestionItem | null {
 
 /** 增量保存到数据库 (去重) */
 export function saveToDatabase(notes: NoteInfo[], dbPath: string): SaveResult {
+  // 确保目录存在
+  const dir = path.dirname(dbPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  
   let existingData: QuestionItem[] = [];
   
   if (fs.existsSync(dbPath)) {
     try {
       const content = fs.readFileSync(dbPath, 'utf-8');
       existingData = JSON.parse(content);
+      if (!Array.isArray(existingData)) {
+        console.warn('[saveToDatabase] 数据格式错误，重置为空数组');
+        existingData = [];
+      }
     } catch {
       console.warn('[saveToDatabase] 无法读取现有数据，将创建新文件');
     }

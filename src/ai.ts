@@ -7,6 +7,12 @@ import { NoteInfo } from './types';
 
 /** 调用 AI API */
 export async function callAI(prompt: string, systemPrompt?: string): Promise<string> {
+  // 检查 API Key 是否配置
+  if (!AI_CONFIG.isConfigured) {
+    console.log('   🧠 [AI] ⚠️ 未配置 API Key，跳过 AI 分析');
+    return '';
+  }
+  
   const messages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
     { role: 'user', content: prompt }
