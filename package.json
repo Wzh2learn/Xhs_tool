@@ -10,6 +10,7 @@
     "puppeteer": "^24.0.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "tesseract.js": "^6.0.1",
     "tsx": "^4.7.0"
   },
   "devDependencies": {

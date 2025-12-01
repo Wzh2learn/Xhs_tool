@@ -1,10 +1,11 @@
 /**
  * XHS Intelligence Agent - 情报搜集系统 (Phase 2)
  * 
- * 📚 v4.2 Expert Knowledge Base Edition
- * - 全明星专家词库 (KEYWORD_POOLS)
- * - 智能混合轮询 (Smart Mix Rotation)
- * - 正文 + 热评双重抓取
+ * 🚀 v5.0 Ultimate Edition
+ * - 👁️ OCR 图片识别 (tesseract.js)
+ * - 🖐️ 拟人化看图 (模拟翻页)
+ * - 🧠 AI 智能分析 (容错增强)
+ * - 📚 全明星专家词库 + 智能混合轮询
  * - 增量写入 + 去重 (note_id)
  * 
  * 🛡️ 安全加固 (Anti-Detection):
@@ -20,6 +21,7 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page, Browser } from 'puppeteer';
 import * as fs from 'fs';
 import * as path from 'path';
+import Tesseract from 'tesseract.js';
 
 // 启用 Stealth 插件 (防检测)
 puppeteerExtra.use(StealthPlugin());
@@ -34,7 +36,25 @@ const REPORTS_DIR = path.join(PROJECT_ROOT, 'reports');
 const DATA_DIR = path.join(PROJECT_ROOT, 'data');  // v4.0: AlgoQuest 数据目录
 
 // ============================================================================
-// v4.2 全明星专家词库 (Expert Knowledge Base)
+// v5.0 AI API 配置 (可自定义代理)
+// ============================================================================
+const AI_CONFIG = {
+  API_BASE: process.env.AI_API_BASE || 'https://yinli.one/v1',
+  API_KEY: process.env.AI_API_KEY || 'sk-6gGjX7JDr35E0TljC8SdNIWoYWpxgIWlUVmSaifLnAnMaa1C',
+  MODEL: process.env.AI_MODEL || 'gemini-2.5-flash',  // flash 更快更稳
+  TIMEOUT: 30000,  // 30秒超时
+  RETRIES: 2,      // 重试次数
+};
+
+// OCR 配置
+const OCR_CONFIG = {
+  MIN_CONTENT_LENGTH: 50,  // 正文少于50字时触发 OCR
+  MAX_IMAGES: 3,           // 最多识别前3张图
+  LANG: 'chi_sim+eng',     // 中英文混合识别
+};
+
+// ============================================================================
+// v5.0 全明星专家词库 (Expert Knowledge Base)
 // ============================================================================
 const KEYWORD_POOLS = {
   // 场景 A: 硬核技术 (搜/广/推/生成式)
@@ -510,6 +530,262 @@ function makeSearchURL(keyword: string): string {
     source: 'web_explore_feed',
   });
   return `https://www.xiaohongshu.com/search_result?${params.toString()}`;
+}
+
+// ============================================================================
+// v5.0 OCR 图片识别 (The "Eye")
+// ============================================================================
+
+/**
+ * 从图片 URL 提取文字 (OCR)
+ */
+async function extractTextFromImage(imageUrl: string): Promise<string> {
+  try {
+    console.log(`   👁️ [OCR] 识别图片: ${imageUrl.substring(0, 50)}...`);
+    
+    const result = await Tesseract.recognize(imageUrl, OCR_CONFIG.LANG, {
+      logger: () => {} // 静默模式
+    });
+    
+    const text = result.data.text.trim();
+    if (text.length > 10) {
+      console.log(`   👁️ [OCR] ✅ 识别到 ${text.length} 字`);
+      return text;
+    }
+    return '';
+  } catch (error: any) {
+    console.log(`   👁️ [OCR] ⚠️ 识别失败: ${error.message || '未知错误'}`);
+    return '';
+  }
+}
+
+/**
+ * v5.0: 从笔记图片中提取 OCR 内容
+ */
+async function extractOCRFromImages(page: Page): Promise<string> {
+  console.log('   👁️ [OCR] 开始图片文字识别...');
+  
+  try {
+    // 获取笔记中的图片 URL
+    const imageUrls = await page.evaluate(() => {
+      const images: string[] = [];
+      
+      // 尝试多种选择器
+      const selectors = [
+        '.note-slider img',
+        '.carousel-image img',
+        '.swiper-slide img',
+        '[class*="image"] img',
+        '.note-content img',
+      ];
+      
+      for (const sel of selectors) {
+        document.querySelectorAll(sel).forEach(img => {
+          const src = (img as HTMLImageElement).src;
+          if (src && src.startsWith('http') && !images.includes(src)) {
+            images.push(src);
+          }
+        });
+        if (images.length > 0) break;
+      }
+      
+      return images;
+    });
+    
+    if (imageUrls.length === 0) {
+      console.log('   👁️ [OCR] 未找到可识别的图片');
+      return '';
+    }
+    
+    console.log(`   👁️ [OCR] 找到 ${imageUrls.length} 张图片，识别前 ${Math.min(imageUrls.length, OCR_CONFIG.MAX_IMAGES)} 张`);
+    
+    const ocrTexts: string[] = [];
+    const imagesToProcess = imageUrls.slice(0, OCR_CONFIG.MAX_IMAGES);
+    
+    for (const url of imagesToProcess) {
+      const text = await extractTextFromImage(url);
+      if (text) {
+        ocrTexts.push(text);
+      }
+    }
+    
+    if (ocrTexts.length > 0) {
+      return '\n\n[OCR Content]\n' + ocrTexts.join('\n---\n');
+    }
+    
+    return '';
+  } catch (error: any) {
+    console.log(`   👁️ [OCR] ⚠️ 批量识别失败: ${error.message || '未知错误'}`);
+    return '';
+  }
+}
+
+// ============================================================================
+// v5.0 拟人化看图 (The "Hand")
+// ============================================================================
+
+/**
+ * v5.0: 模拟真人翻看图片
+ */
+async function humanViewImages(page: Page): Promise<void> {
+  console.log('   🖐️ [ViewImages] 模拟翻看图片...');
+  
+  try {
+    // 图片轮播"下一张"按钮的可能选择器
+    const nextButtonSelectors = [
+      '.carousel-next',
+      '.swiper-button-next',
+      '[class*="next"]',
+      '.image-viewer-next',
+      '.note-slider-next',
+      'button[aria-label="next"]',
+      '.slider-arrow-right',
+    ];
+    
+    let nextButton = null;
+    for (const sel of nextButtonSelectors) {
+      nextButton = await page.$(sel);
+      if (nextButton) {
+        console.log(`   🖐️ [ViewImages] 找到翻页按钮: ${sel}`);
+        break;
+      }
+    }
+    
+    if (!nextButton) {
+      // 尝试直接点击图片区域滑动
+      const imageArea = await page.$('.note-slider, .carousel, .swiper-container, [class*="image"]');
+      if (imageArea) {
+        console.log('   🖐️ [ViewImages] 未找到按钮，尝试滑动图片区域');
+        // 随机点击 1-2 次
+        const clicks = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < clicks; i++) {
+          await imageArea.click();
+          await delay(800 + Math.random() * 500);
+        }
+      }
+      return;
+    }
+    
+    // 随机点击 2-4 次 (模拟看多张图)
+    const viewCount = 2 + Math.floor(Math.random() * 3);
+    console.log(`   🖐️ [ViewImages] 将翻看 ${viewCount} 张图片`);
+    
+    for (let i = 0; i < viewCount; i++) {
+      try {
+        await nextButton.click();
+        // 每张图看 1-2 秒
+        const viewTime = 1000 + Math.random() * 1000;
+        await delay(viewTime);
+        console.log(`   🖐️ [ViewImages] 看第 ${i + 2} 张图 (${Math.round(viewTime/1000)}s)`);
+      } catch {
+        break; // 可能已经到最后一张
+      }
+    }
+    
+  } catch (error: any) {
+    console.log(`   🖐️ [ViewImages] 翻图失败 (非致命): ${error.message || ''}`);
+  }
+}
+
+// ============================================================================
+// v5.0 AI 智能分析 (The "Brain") - 容错增强版
+// ============================================================================
+
+/**
+ * 调用 AI API (带超时和重试，容错增强)
+ */
+async function callAI(prompt: string, systemPrompt?: string): Promise<string> {
+  const messages = [
+    ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+    { role: 'user', content: prompt }
+  ];
+
+  for (let attempt = 0; attempt <= AI_CONFIG.RETRIES; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), AI_CONFIG.TIMEOUT);
+
+      const response = await fetch(`${AI_CONFIG.API_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${AI_CONFIG.API_KEY}`
+        },
+        body: JSON.stringify({
+          model: AI_CONFIG.MODEL,
+          messages,
+          stream: false,
+          max_tokens: 1000,
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`API ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || '';
+    } catch (error: any) {
+      const isLastAttempt = attempt === AI_CONFIG.RETRIES;
+      if (isLastAttempt) {
+        console.log(`   🧠 [AI] ⚠️ 调用失败: ${error.message || '网络错误'}`);
+        return ''; // 返回空而不是抛异常
+      }
+      console.log(`   🧠 [AI] 重试 ${attempt + 1}/${AI_CONFIG.RETRIES}...`);
+      await delay(2000);
+    }
+  }
+  return '';
+}
+
+/**
+ * v5.0: AI 生成智能报告 (容错版)
+ */
+async function generateAIReport(notes: NoteInfo[]): Promise<string> {
+  if (notes.length === 0) {
+    return '今日未采集到有效内容。';
+  }
+
+  console.log('[AI] 🧠 正在生成智能分析...');
+
+  // 构建笔记摘要 (包含 OCR 内容)
+  const noteSummaries = notes.slice(0, 6).map((n, i) => {
+    let summary = `【${i + 1}】${n.title}\n`;
+    summary += `内容: ${n.content.substring(0, 200)}`;
+    // 如果有 OCR 内容，也包含进去
+    if (n.fullContent && n.fullContent.includes('[OCR Content]')) {
+      const ocrPart = n.fullContent.split('[OCR Content]')[1]?.substring(0, 200) || '';
+      summary += `\n图片文字: ${ocrPart}`;
+    }
+    return summary;
+  }).join('\n\n');
+
+  const prompt = `分析以下 ${notes.length} 篇小红书面试笔记，生成简洁报告：
+
+${noteSummaries}
+
+请用 Markdown 格式输出：
+1. **核心面试题** (提取2-3个具体问题)
+2. **技术热点** (涉及的技术栈)
+3. **复习建议** (1-2条)
+
+控制在 200 字以内，直接输出内容。`;
+
+  try {
+    const report = await callAI(prompt);
+    if (report) {
+      console.log('[AI] 🧠 ✅ 分析完成');
+      return report;
+    }
+  } catch (error: any) {
+    console.log(`[AI] 🧠 ⚠️ 分析失败: ${error.message || '未知错误'}`);
+  }
+
+  // 失败兜底
+  return `*[AI 分析待补充]*\n\n本次采集了 ${notes.length} 篇笔记，请人工查看 \`data/interview_questions.json\` 进行分析。`;
 }
 
 // 已读笔记标题集合 (用于去重)
@@ -1306,6 +1582,21 @@ async function readNoteByClick(page: Page, index: number, source: string, skipVi
   await simulateReadingInModal(page);
   await randomDelay(2000, 3000);
 
+  // v5.0: 模拟翻看图片 (The "Hand")
+  await humanViewImages(page);
+  await randomDelay(1000, 2000);
+
+  // v5.0: 如果正文太短，触发 OCR (The "Eye")
+  let finalContent = detail.content;
+  if (detail.content.length < OCR_CONFIG.MIN_CONTENT_LENGTH) {
+    console.log(`   👁️ 正文仅 ${detail.content.length} 字，触发 OCR 识别...`);
+    const ocrContent = await extractOCRFromImages(page);
+    if (ocrContent) {
+      finalContent = detail.content + ocrContent;
+      console.log(`   👁️ OCR 补充后共 ${finalContent.length} 字`);
+    }
+  }
+
   // v4.1: 从当前 URL 提取 note_id
   const currentUrl = page.url();
   const noteId = extractNoteId(currentUrl);
@@ -1324,8 +1615,9 @@ async function readNoteByClick(page: Page, index: number, source: string, skipVi
   await closeModal(page);
   await delay(1000);
 
-  if (detail.content.length < 20) {
-    console.log(`   ⚠️ 内容太短 (<20字)，可能是视频，跳过`);
+  // v5.0: 放宽限制，即使正文短但有 OCR 内容也接受
+  if (finalContent.length < 20) {
+    console.log(`   ⚠️ 内容太短 (<20字) 且 OCR 无结果，跳过`);
     return null;
   }
 
@@ -1342,8 +1634,8 @@ async function readNoteByClick(page: Page, index: number, source: string, skipVi
     likes: detail.likes || '0',
     link: noteLink,                        // v4.1: 笔记链接
     noteId: noteId,                        // v4.1: 笔记ID (去重用)
-    content: detail.content.substring(0, CONTENT_SUMMARY_LENGTH),
-    fullContent: detail.content,           // v4.1: 完整正文
+    content: finalContent.substring(0, CONTENT_SUMMARY_LENGTH),
+    fullContent: finalContent,             // v5.0: 完整正文 (含 OCR)
     tags: detail.tags,
     comments: comments,  // v4.0: 热评
   };
@@ -1463,7 +1755,7 @@ function generateDailyReport(allNotes: NoteInfo[]): string {
 
   let report = `# 📅 ${today} 搜广推情报日报\n\n`;
   report += `> 🕐 生成时间: ${new Date().toLocaleTimeString('zh-CN')}\n`;
-  report += `> 📚 v4.2 Expert Knowledge Base Edition - 技术+大厂+热点 智能混合\n`;
+  report += `> 🚀 v5.0 Ultimate Edition - OCR + 看图 + AI 分析\n`;
   report += `> 📊 共收录 ${allNotes.length} 篇笔记\n\n`;
   report += `---\n\n`;
 
@@ -1518,13 +1810,13 @@ function generateDailyReport(allNotes: NoteInfo[]): string {
   report += `3. **拆题输出**: 用"实习生拆题"模板，针对评论区问题展开\n`;
   report += `4. **发布**: 运行 \`npx tsx publisher.ts\` 发布你的拆解\n\n`;
   report += `---\n`;
-  report += `_Generated by XHS Intelligence Agent v4.2 (Expert Knowledge Base Edition)_\n`;
+  report += `_Generated by XHS Intelligence Agent v5.0 (Ultimate Edition)_\n`;
 
   return report;
 }
 
 // ============================================================================
-// AlgoQuest 生态联动 - JSON 数据导出 (v4.2 Expert Knowledge Base)
+// AlgoQuest 生态联动 - JSON 数据导出 (v5.0 Ultimate Edition)
 // ============================================================================
 
 /**
@@ -1654,14 +1946,14 @@ function saveToDatabase(allNotes: NoteInfo[], dbPath: string): {
 }
 
 // ============================================================================
-// MAIN - 主程序 (v4.2 Expert Knowledge Base Edition)
+// MAIN - 主程序 (v5.0 Ultimate Edition)
 // ============================================================================
 
 async function main(): Promise<void> {
   console.log('╔════════════════════════════════════════╗');
   console.log('║  XHS Intelligence - 情报搜集系统       ║');
-  console.log('║  📚 v4.2 Expert Knowledge Base Edition ║');
-  console.log('║  🎯 技术+大厂+热点 智能混合轮询       ║');
+  console.log('║  🚀 v5.0 Ultimate Edition              ║');
+  console.log('║  👁️ OCR + 🖐️ 看图 + 🧠 AI 分析        ║');
   console.log('╚════════════════════════════════════════╝');
   console.log();
 
@@ -1813,8 +2105,13 @@ async function main(): Promise<void> {
       fs.mkdirSync(REPORTS_DIR, { recursive: true });
     }
 
-    // 生成日报
-    const report = generateDailyReport(allNotes);
+    // 生成基础报告
+    let report = generateDailyReport(allNotes);
+    
+    // v5.0: AI 智能分析 (The "Brain")
+    console.log('[main] Step 6b: AI 智能分析...');
+    const aiSummary = await generateAIReport(allNotes);
+    report += '\n\n---\n\n## 🧠 AI 智能分析\n\n' + aiSummary;
 
     const reportFileName = `daily_trends_${new Date().toISOString().split('T')[0]}.md`;
     const reportPath = path.join(REPORTS_DIR, reportFileName);
@@ -1839,11 +2136,12 @@ async function main(): Promise<void> {
 
     console.log();
     console.log('╔════════════════════════════════════════╗');
-    console.log('║   ✅ v4.2 情报搜集完成！               ║');
+    console.log('║   ✅ v5.0 情报搜集完成！               ║');
     console.log('╚════════════════════════════════════════╝');
     console.log();
     console.log(`  📊 共阅读: ${allNotes.length} 篇有效笔记`);
-    console.log(`  💬 已提取社区热评`);
+    console.log(`  👁️ OCR 图片识别已启用`);
+    console.log(`  🧠 AI 智能分析已生成`);
     console.log(`  📁 日报: ${reportPath}`);
     console.log();
     console.log(`  🎯 AlgoQuest 数据库更新:`);
@@ -1852,7 +2150,7 @@ async function main(): Promise<void> {
     console.log(`     - 总计: ${saveResult.total} 道题`);
     console.log(`     - 路径: ${dbPath}`);
     console.log();
-    console.log('  📚 v4.2 专家词库: 技术+大厂+热点 智能混合');
+    console.log('  🚀 v5.0 Ultimate: Eye + Hand + Brain 全开');
     console.log('  💡 数据库使用 note_id 去重，可放心重复运行！');
 
   } catch (error) {
