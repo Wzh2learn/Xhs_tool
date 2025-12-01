@@ -25,6 +25,20 @@
 // 加载环境变量 (从 .env 文件)
 import 'dotenv/config';
 
+// 🛡️ 全局错误处理 (防止 tesseract.js Worker 异常导致崩溃)
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('   ⚠️ [全局] 未捕获的 Promise 拒绝，已忽略:', String(reason).substring(0, 50));
+});
+process.on('uncaughtException', (error) => {
+  // 只忽略 OCR 相关的 fetch 错误
+  if (error.message?.includes('fetch failed')) {
+    console.log('   ⚠️ [OCR] 网络错误，已忽略');
+    return;
+  }
+  // 其他错误正常抛出
+  throw error;
+});
+
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page, Browser } from 'puppeteer';
@@ -588,62 +602,58 @@ async function extractTextFromImage(imageUrl: string): Promise<string> {
 }
 
 /**
- * v5.0: 从笔记图片中提取 OCR 内容
+ * v5.0: 从笔记图片中提取 OCR 内容 (防御性增强)
+ * - 截图替代 URL 方式 (解决 CDN 访问问题)
+ * - 全局 try-catch 防崩溃
  */
 async function extractOCRFromImages(page: Page): Promise<string> {
   console.log('   👁️ [OCR] 开始图片文字识别...');
   
   try {
-    // 获取笔记中的图片 URL
-    const imageUrls = await page.evaluate(() => {
-      const images: string[] = [];
-      
-      // 尝试多种选择器
-      const selectors = [
-        '.note-slider img',
-        '.carousel-image img',
-        '.swiper-slide img',
-        '[class*="image"] img',
-        '.note-content img',
-      ];
-      
-      for (const sel of selectors) {
-        document.querySelectorAll(sel).forEach(img => {
-          const src = (img as HTMLImageElement).src;
-          if (src && src.startsWith('http') && !images.includes(src)) {
-            images.push(src);
-          }
-        });
-        if (images.length > 0) break;
-      }
-      
-      return images;
-    });
+    // 方案 B: 直接对页面图片区域截图 (避免 CDN 访问问题)
+    const imageElement = await page.$('.note-slider img, .carousel-image img, .swiper-slide img, [class*="media"] img');
     
-    if (imageUrls.length === 0) {
-      console.log('   👁️ [OCR] 未找到可识别的图片');
+    if (!imageElement) {
+      console.log('   👁️ [OCR] 未找到图片元素');
       return '';
     }
     
-    console.log(`   👁️ [OCR] 找到 ${imageUrls.length} 张图片，识别前 ${Math.min(imageUrls.length, OCR_CONFIG.MAX_IMAGES)} 张`);
+    console.log('   👁️ [OCR] 找到图片，截图识别中...');
     
-    const ocrTexts: string[] = [];
-    const imagesToProcess = imageUrls.slice(0, OCR_CONFIG.MAX_IMAGES);
+    // 截图到 Buffer (不写磁盘)
+    const screenshotBuffer = await imageElement.screenshot({ encoding: 'binary' });
     
-    for (const url of imagesToProcess) {
-      const text = await extractTextFromImage(url);
-      if (text) {
-        ocrTexts.push(text);
-      }
+    if (!screenshotBuffer || screenshotBuffer.length === 0) {
+      console.log('   👁️ [OCR] 截图失败');
+      return '';
     }
     
-    if (ocrTexts.length > 0) {
-      return '\n\n[OCR Content]\n' + ocrTexts.join('\n---\n');
+    // OCR 识别截图 (带超时)
+    const ocrPromise = Tesseract.recognize(
+      Buffer.from(screenshotBuffer),
+      OCR_CONFIG.LANG,
+      { logger: () => {} }
+    );
+    
+    const result = await withTimeout(ocrPromise, OCR_CONFIG.TIMEOUT, null);
+    
+    if (!result) {
+      console.log(`   👁️ [OCR] ⏱️ 超时 (>${OCR_CONFIG.TIMEOUT/1000}s)，跳过`);
+      return '';
     }
     
+    const text = result.data.text.trim();
+    if (text.length > 10) {
+      console.log(`   👁️ [OCR] ✅ 识别到 ${text.length} 字`);
+      return '\n\n[OCR Content]\n' + text;
+    }
+    
+    console.log('   👁️ [OCR] 识别文字太少，跳过');
     return '';
+    
   } catch (error: any) {
-    console.log(`   👁️ [OCR] ⚠️ 批量识别失败: ${error.message || '未知错误'}`);
+    // 🛡️ 全局兜底：任何错误都不崩溃
+    console.log(`   👁️ [OCR] ⚠️ 识别失败 (非致命): ${error.message || '未知错误'}`);
     return '';
   }
 }
