@@ -52,26 +52,13 @@ export const SELECTORS = {
   POPOVER: 'div.d-popover',
 } as const;
 
-// ============================================================================
-// HELPER FUNCTIONS - 核心辅助函数 (从 Go 源码翻译)
-// ============================================================================
+// === 辅助函数 ===
 
-/**
- * 延时函数
- */
 export function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * 移除弹窗遮挡层
- * Ported from publish.go:79-98 (removePopCover)
- * 
- * Go 源码逻辑:
- * 1. 检测 div.d-popover 是否存在
- * 2. 如果存在则 Remove
- * 3. 兜底：点击空白区域 (随机坐标 380-480, 20-80)
- */
+/** 移除弹窗遮挡层 (publish.go:79-98) */
 export async function removePopCover(page: Page): Promise<void> {
   try {
     // 检测并移除弹窗
@@ -92,22 +79,14 @@ export async function removePopCover(page: Page): Promise<void> {
   }
 }
 
-/**
- * 点击空白区域 (防止弹窗遮挡)
- * Ported from publish.go:94-98 (clickEmptyPosition)
- */
+/** 点击空白区域 (publish.go:94-98) */
 async function clickEmptyPosition(page: Page): Promise<void> {
   const x = 380 + Math.floor(Math.random() * 100);  // 380-480
   const y = 20 + Math.floor(Math.random() * 60);    // 20-80
   await page.mouse.click(x, y);
 }
 
-/**
- * 检测元素是否被遮挡
- * Ported from publish.go:168-184 (isElementBlocked)
- * 
- * 使用 document.elementFromPoint 判断元素中心点是否被其他元素覆盖
- */
+/** 检测元素是否被遮挡 (publish.go:168-184) */
 export async function isElementBlocked(page: Page, element: ElementHandle): Promise<boolean> {
   return await page.evaluate((el) => {
     const rect = el.getBoundingClientRect();
@@ -121,15 +100,7 @@ export async function isElementBlocked(page: Page, element: ElementHandle): Prom
   }, element);
 }
 
-/**
- * 等待图片上传完成
- * Ported from publish.go:212-240 (waitForUploadComplete)
- * 
- * Go 源码逻辑:
- * - 最长等待 60 秒
- * - 每 500ms 检查一次
- * - 检测 .img-preview-area .pr 元素数量是否 >= expectedCount
- */
+/** 等待图片上传完成 (publish.go:212-240) */
 export async function waitForUploadComplete(
   page: Page,
   expectedCount: number,
@@ -162,15 +133,7 @@ export async function waitForUploadComplete(
   throw new Error(`上传超时 (${maxWaitMs}ms)，请检查网络连接和图片大小`);
 }
 
-/**
- * 获取正文编辑器元素 (Race 双策略)
- * Ported from publish.go:269-292 (getContentElement)
- * 
- * Go 源码逻辑:
- * 1. 尝试方案一: div.ql-editor (Quill 富文本编辑器)
- * 2. 尝试方案二: 查找 placeholder="输入正文描述" 的 <p> 元素，向上查找 role="textbox" 的父级
- * 3. 使用 Race 策略，哪个先找到用哪个
- */
+/** 获取正文编辑器 (publish.go:269-292, Race 双策略) */
 export async function getContentEditor(page: Page): Promise<ElementHandle<Element>> {
   console.log('[getContentEditor] 开始查找正文编辑器...');
 
@@ -194,15 +157,7 @@ export async function getContentEditor(page: Page): Promise<ElementHandle<Elemen
   throw new Error('没有找到内容输入框 (两种策略均失败)');
 }
 
-/**
- * 通过 placeholder 查找 textbox
- * Ported from publish.go:354-410 (findTextboxByPlaceholder)
- * 
- * 逻辑:
- * 1. 查找所有 <p> 元素
- * 2. 找到 data-placeholder 包含 "输入正文描述" 的元素
- * 3. 向上遍历最多 5 层，找到 role="textbox" 的父级
- */
+/** 通过 placeholder 查找 textbox (publish.go:354-410) */
 async function findTextboxByPlaceholder(page: Page): Promise<ElementHandle<Element> | null> {
   try {
     // 查找带有特定 placeholder 的 <p> 元素
@@ -239,10 +194,7 @@ async function findTextboxByPlaceholder(page: Page): Promise<ElementHandle<Eleme
   }
 }
 
-/**
- * 检查元素是否可见
- * Ported from publish.go:412-436 (isElementVisible)
- */
+/** 检查元素是否可见 (publish.go:412-436) */
 async function isElementVisible(page: Page, element: ElementHandle): Promise<boolean> {
   try {
     return await page.evaluate((el) => {
@@ -268,15 +220,7 @@ async function isElementVisible(page: Page, element: ElementHandle): Promise<boo
   }
 }
 
-/**
- * 点击发布 Tab (处理遮挡)
- * Ported from publish.go:100-134 (mustClickPublishTab)
- * 
- * 逻辑:
- * 1. 等待 upload-content 容器出现
- * 2. 在 15 秒内循环尝试点击目标 Tab
- * 3. 如果被遮挡，调用 removePopCover 后重试
- */
+/** 点击发布 Tab (publish.go:100-134) */
 export async function clickPublishTab(page: Page, tabName: string): Promise<void> {
   console.log(`[clickPublishTab] 尝试点击 Tab: "${tabName}"`);
 
@@ -319,13 +263,8 @@ export async function clickPublishTab(page: Page, tabName: string): Promise<void
   throw new Error(`没有找到发布 Tab: "${tabName}"`);
 }
 
-// ============================================================================
-// TYPES - 数据结构定义
-// ============================================================================
+// === 类型定义 ===
 
-/**
- * Draft 对象 - 待发布的内容
- */
 export interface Draft {
   title: string;        // 标题 (最大40单位长度)
   content: string;      // 正文内容
@@ -333,12 +272,9 @@ export interface Draft {
   imagePaths: string[]; // 本地图片路径列表
 }
 
-// ============================================================================
-// CONTENT FORMATTING - 内容格式化 (Markdown -> 小红书风格)
-// ============================================================================
+// === 内容格式化 ===
 
-/**
- * 将 Markdown 内容转换为小红书友好的格式
+/** 将 Markdown 转换为小红书风格
  * 
  * 转换规则:
  * - **加粗** -> 【加粗】
@@ -420,23 +356,9 @@ async function typeContentLineByLine(
   console.log('[typeContentLineByLine] 正文输入完成');
 }
 
-// ============================================================================
-// BUSINESS LOGIC - 核心业务逻辑
-// ============================================================================
+// === 核心业务逻辑 ===
 
-/**
- * 输入标签 (核心难点)
- * Ported from publish.go:294-351 (inputTags)
- * 
- * Go 源码逻辑:
- * 1. 先按 20 次 ArrowDown (确保光标在末尾)
- * 2. 按 2 次 Enter (换行)
- * 3. 对每个标签:
- *    a. 输入 "#"
- *    b. 逐字符输入标签名 (50ms 间隔)
- *    c. 等待联想菜单 (1s)
- *    d. 点击第一个联想结果，或输入空格结束
- */
+/** 输入标签 (publish.go:294-351) */
 export async function inputTags(
   page: Page,
   contentEditor: ElementHandle<Element>,
@@ -472,10 +394,7 @@ export async function inputTags(
   }
 }
 
-/**
- * 输入单个标签
- * Ported from publish.go:321-351 (inputTag)
- */
+/** 输入单个标签 (publish.go:321-351) */
 async function inputSingleTag(
   page: Page,
   contentEditor: ElementHandle<Element>,
@@ -520,21 +439,7 @@ async function inputSingleTag(
   await delay(500);  // publish.go:351 - 等待标签处理完成
 }
 
-/**
- * 发布笔记 - 主流程
- * Ported from publish.go:53-77 (Publish) + service.go:213-227
- * 
- * 完整发布流程:
- * 1. 导航到发布页
- * 2. 处理弹窗遮挡
- * 3. 点击"上传图文" Tab
- * 4. 上传图片
- * 5. 等待上传完成
- * 6. 输入标题
- * 7. 输入正文
- * 8. 输入标签
- * 9. 点击发布按钮
- */
+/** 发布笔记主流程 (publish.go:53-77) */
 export async function publishNote(page: Page, draft: Draft): Promise<void> {
   console.log('========================================');
   console.log(`[publishNote] 开始发布: "${draft.title}"`);
@@ -605,25 +510,13 @@ export async function publishNote(page: Page, draft: Draft): Promise<void> {
   console.log('========================================');
 }
 
-// ============================================================================
-// FILE PARSING - Markdown 解析与文件操作
-// ============================================================================
-
-// 项目路径配置
+// === Markdown 解析 ===
 const PROJECT_ROOT = 'd:/AIlearn/xhs_automation';
 const DRAFTS_DIR = path.join(PROJECT_ROOT, 'content/drafts');
 const PUBLISHED_DIR = path.join(PROJECT_ROOT, 'content/published');
 const COOKIES_PATH = path.join(PROJECT_ROOT, 'xhs_cookies.json');
 
-/**
- * 解析 Markdown 文件为 Draft 对象
- * 
- * 解析规则:
- * - 第一行以 "# " 开头 -> Title
- * - 包含 #标签 的行 -> Tags (提取所有 # 开头的词)
- * - 其余部分 -> Content
- * - 图片 -> 与 .md 同名的 .jpg/.png/.jpeg 文件
- */
+/** 解析 Markdown 文件为 Draft 对象 */
 export function parseMarkdown(mdFilePath: string): Draft {
   console.log(`[parseMarkdown] 解析文件: ${mdFilePath}`);
 
@@ -703,9 +596,7 @@ export function parseMarkdown(mdFilePath: string): Draft {
   return draft;
 }
 
-/**
- * 扫描 drafts 目录，返回第一个 .md 文件路径
- */
+/** 扫描 drafts 目录 */
 function findFirstDraft(): string | null {
   // 确保目录存在
   if (!fs.existsSync(DRAFTS_DIR)) {
@@ -724,9 +615,7 @@ function findFirstDraft(): string | null {
   return null;
 }
 
-/**
- * 归档已发布的文件 (移动到 published 目录)
- */
+/** 归档已发布的文件 */
 function archivePublishedFiles(draft: Draft, mdFilePath: string): void {
   // 确保 published 目录存在
   if (!fs.existsSync(PUBLISHED_DIR)) {
@@ -752,9 +641,7 @@ function archivePublishedFiles(draft: Draft, mdFilePath: string): void {
   }
 }
 
-/**
- * 加载 Cookies 并注入到页面
- */
+/** 加载 Cookies */
 async function loadCookies(page: Page): Promise<void> {
   if (!fs.existsSync(COOKIES_PATH)) {
     console.warn(`[loadCookies] Cookie 文件不存在: ${COOKIES_PATH}`);
@@ -770,9 +657,7 @@ async function loadCookies(page: Page): Promise<void> {
   console.log(`[loadCookies] 已加载 ${cookies.length} 个 Cookie`);
 }
 
-// ============================================================================
-// MAIN - 程序入口
-// ============================================================================
+// === 程序入口 ===
 
 async function main(): Promise<void> {
   console.log('╔════════════════════════════════════════╗');
@@ -886,31 +771,4 @@ async function main(): Promise<void> {
   }
 }
 
-// 运行主程序
 main().catch(console.error);
-
-// ============================================================================
-// EXPORTS SUMMARY
-// ============================================================================
-// 
-// Types:
-//   - Draft: 待发布内容的数据结构
-//
-// Constants:
-//   - SELECTORS: 所有 CSS 选择器
-//
-// Helper Functions:
-//   - delay(ms): 延时
-//   - removePopCover(page): 移除弹窗遮挡
-//   - isElementBlocked(page, element): 检测元素遮挡
-//   - waitForUploadComplete(page, count): 等待图片上传完成
-//   - getContentEditor(page): 获取正文编辑器 (Race 策略)
-//   - clickPublishTab(page, tabName): 点击发布 Tab
-//
-// Business Logic:
-//   - inputTags(page, editor, tags): 输入标签 (含联想点击)
-//   - publishNote(page, draft): 完整发布流程
-//   - parseMarkdown(path): 解析 Markdown 文件
-//   - main(): 程序入口
-//
-// ============================================================================
