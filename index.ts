@@ -104,54 +104,42 @@ const SAFETY_CONFIG = {
   TYPING_DELAY_MAX: 200,
 };
 
-// ============================================================================
-// TYPES - 数据类型
-// ============================================================================
+// === 类型定义 ===
 
-// v4.0 新增：评论信息
 interface CommentInfo {
-  author: string;       // 评论者昵称
-  content: string;      // 评论内容
-  likes: string;        // 点赞数
+  author: string;
+  content: string;
+  likes: string;
 }
 
 interface NoteInfo {
   keyword: string;
   title: string;
   author: string;
-  authorLink: string;   // v4.0: 作者主页链接
+  authorLink: string;
   likes: string;
-  link: string;         // v4.1: 笔记链接
-  noteId: string;       // v4.1: 笔记唯一ID (用于去重)
-  // v3.0 新增：详情页内容
-  content: string;      // 正文摘要 (前500字)
-  fullContent: string;  // v4.1: 完整正文
-  tags: string[];       // 标签列表
-  // v4.0 新增：热门评论
-  comments: CommentInfo[];  // Top 5 热评
+  link: string;
+  noteId: string;
+  content: string;
+  fullContent: string;
+  tags: string[];
+  comments: CommentInfo[];
 }
 
-// ============================================================================
-// DOM SELECTORS - 容错性高的选择器 (纯视觉抓取)
-// ============================================================================
+// === DOM 选择器 ===
 
-// 登录状态检查选择器 - 精简版，避免误判
-// 注意：不要用 img[src*="qr"]，因为搜索页也可能有二维码图片
 const LOGIN_CHECK_SELECTORS = [
   '.login-container',        // 登录容器
   '.login-modal',            // 登录弹窗
   '.qrcode-login',           // 二维码登录区域
 ];
 
-// 登录页 URL 特征
 const LOGIN_URL_PATTERNS = [
   '/login',
   '/signin', 
 ];
 
-// 详情页选择器 (小红书详情页通常是弹窗/侧边栏形式)
 const DETAIL_SELECTORS = {
-  // 正文内容 - 多种可能的选择器
   CONTENT: [
     '.note-content',                    // 笔记内容区
     '#detail-desc',                     // 详情描述
@@ -163,14 +151,12 @@ const DETAIL_SELECTORS = {
     'article',                          // 语义化文章
     '.text-content',
   ],
-  // 标签
   TAGS: [
     'a.tag',
     '.hash-tag',
     'a[href*="/search_result"]',
     '[class*="tag"]',
   ],
-  // 作者 - 详情页顶部
   AUTHOR: [
     '.author-wrapper .name',
     '.user-name',
@@ -178,28 +164,24 @@ const DETAIL_SELECTORS = {
     '.nickname',
     '[class*="author"] [class*="name"]',
   ],
-  // 点赞数 - 底部互动栏
   LIKES: [
     '.like-wrapper .count',
     '.engage-bar-container .like .count',
     '[class*="like"] .count',
     '[class*="like-count"]',
   ],
-  // 详情页容器 (用于判断是否弹窗打开)
   CONTAINER: [
     '.note-detail-mask',                // 弹窗遮罩
     '.note-container',                  // 笔记容器  
     '[class*="noteDetail"]',
     '.detail-container',
   ],
-  // v4.0 新增：作者主页链接
   AUTHOR_LINK: [
     '.author-wrapper a[href*="/user/profile/"]',
     '.user-info a[href*="/user/"]',
     'a.author[href*="/user/"]',
     '[class*="author"] a[href*="/user/"]',
   ],
-  // v4.0 新增：评论区选择器
   COMMENTS: {
     CONTAINER: [
       '.comments-container',
@@ -231,9 +213,7 @@ const DETAIL_SELECTORS = {
   },
 };
 
-// 多套选择器备选，提高容错性
 const NOTE_SELECTORS = {
-  // 笔记卡片容器 (按优先级尝试)
   CARD_CONTAINERS: [
     'section.note-item',
     '.note-item',
@@ -241,7 +221,6 @@ const NOTE_SELECTORS = {
     '[data-note-id]',
     '.search-result-item',
   ],
-  // 标题 (按优先级尝试)
   TITLE: [
     '.title span',
     '.title',
@@ -249,7 +228,6 @@ const NOTE_SELECTORS = {
     'a.title',
     '[class*="title"]',
   ],
-  // 作者 (按优先级尝试)
   AUTHOR: [
     '.author .name',
     '.user-name',
@@ -257,7 +235,6 @@ const NOTE_SELECTORS = {
     '.author-name',
     '[class*="author"] [class*="name"]',
   ],
-  // 点赞数 (按优先级尝试)
   LIKES: [
     '.like-wrapper .count',
     '.like .count',
@@ -265,7 +242,6 @@ const NOTE_SELECTORS = {
     '[class*="like"] [class*="count"]',
     '.engagement .count',
   ],
-  // 链接 (按优先级尝试)
   LINK: [
     'a[href*="/explore/"]',
     'a[href*="/discovery/"]',
@@ -275,29 +251,18 @@ const NOTE_SELECTORS = {
   ],
 };
 
-// ============================================================================
-// HELPER FUNCTIONS - 拟人化工具函数
-// ============================================================================
+// === 辅助函数 ===
 
-/**
- * 固定延时
- */
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * 随机延时 (拟人化核心)
- */
 function randomDelay(min: number, max: number): Promise<void> {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return delay(ms);
 }
 
-/**
- * v4.1 安全加固：模拟人类鼠标移动轨迹
- * 使用贝塞尔曲线生成自然的移动路径
- */
+/** 模拟人类鼠标移动 (贝塞尔曲线) */
 async function humanMouseMove(page: Page, targetX: number, targetY: number): Promise<void> {
   const mouse = page.mouse;
   
@@ -331,9 +296,7 @@ async function humanMouseMove(page: Page, targetX: number, targetY: number): Pro
   }
 }
 
-/**
- * v4.1 安全加固：模拟人类点击 (带鼠标移动 + 随机偏移)
- */
+/** 模拟人类点击 */
 async function humanClick(page: Page, element: any): Promise<void> {
   try {
     // 获取元素位置
@@ -366,9 +329,7 @@ async function humanClick(page: Page, element: any): Promise<void> {
   }
 }
 
-/**
- * v4.1 安全加固：模拟人类打字 (变速 + 偶尔停顿)
- */
+/** 模拟人类打字 */
 async function humanType(page: Page, selector: string, text: string): Promise<void> {
   await page.click(selector);
   await delay(200 + Math.random() * 300);
@@ -395,11 +356,7 @@ async function humanType(page: Page, selector: string, text: string): Promise<vo
   }
 }
 
-/**
- * v4.1: 从 URL 提取笔记 ID
- * 支持多种 URL 格式：
- * - https://www.xiaohongshu.com/explore/64f123abc
- * - https://www.xiaohongshu.com/discovery/item/64f123abc
+/** 从 URL 提取笔记 ID
  * - https://www.xiaohongshu.com/search_result/64f123abc
  */
 function extractNoteId(url: string): string {
@@ -426,9 +383,7 @@ function extractNoteId(url: string): string {
   return fallbackMatch ? fallbackMatch[1] : '';
 }
 
-/**
- * v4.1 安全加固：模拟人类滚动浏览 (随机次数 + 不规则距离)
- */
+/** 模拟人类滚动浏览 */
 async function humanScroll(page: Page): Promise<void> {
   console.log('[humanScroll] 模拟浏览行为...');
 
@@ -469,9 +424,6 @@ async function humanScroll(page: Page): Promise<void> {
   }
 }
 
-/**
- * 加载 Cookies
- */
 async function loadCookies(page: Page): Promise<boolean> {
   if (!fs.existsSync(COOKIES_PATH)) {
     console.warn('[loadCookies] Cookie 文件不存在，请先运行 login.ts');
@@ -485,9 +437,6 @@ async function loadCookies(page: Page): Promise<boolean> {
   return true;
 }
 
-/**
- * 构建搜索 URL
- */
 function makeSearchURL(keyword: string): string {
   const params = new URLSearchParams({
     keyword: keyword,
@@ -496,13 +445,9 @@ function makeSearchURL(keyword: string): string {
   return `https://www.xiaohongshu.com/search_result?${params.toString()}`;
 }
 
-// ============================================================================
-// v5.0 OCR 图片识别 (The "Eye") - 防御性增强
-// ============================================================================
+// === OCR 图片识别 ===
 
-/**
- * 带超时的 Promise 包装器
- */
+/** 带超时的 Promise 包装器 */
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
     promise,
@@ -510,9 +455,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 }
 
-/**
- * 从图片 URL 提取文字 (OCR) - 带 10 秒超时保护
- */
+/** 从图片 URL 提取文字 (OCR) */
 async function extractTextFromImage(imageUrl: string): Promise<string> {
   try {
     console.log(`   👁️ [OCR] 识别图片: ${imageUrl.substring(0, 50)}...`);
@@ -541,11 +484,7 @@ async function extractTextFromImage(imageUrl: string): Promise<string> {
   }
 }
 
-/**
- * v5.0: 从笔记图片中提取 OCR 内容 (防御性增强)
- * - 截图替代 URL 方式 (解决 CDN 访问问题)
- * - 全局 try-catch 防崩溃
- */
+/** 从笔记图片中提取 OCR 内容 (截图方式) */
 async function extractOCRFromImages(page: Page): Promise<string> {
   console.log('   👁️ [OCR] 开始图片文字识别...');
   
@@ -598,17 +537,9 @@ async function extractOCRFromImages(page: Page): Promise<string> {
   }
 }
 
-// ============================================================================
-// v5.0 拟人化看图 (The "Hand") - 通用选择器 + 优雅容错
-// ============================================================================
+// === 拟人化看图 ===
 
-/**
- * v5.0: 模拟真人翻看图片 (防御性增强)
- * - 多级选择器回退
- * - aria-label 无障碍属性
- * - SVG 图标按钮
- * - 单图优雅退出
- */
+/** 模拟真人翻看图片 (多级选择器回退) */
 async function humanViewImages(page: Page): Promise<void> {
   console.log('   🖐️ [ViewImages] 模拟翻看图片...');
   
@@ -700,13 +631,9 @@ async function humanViewImages(page: Page): Promise<void> {
   }
 }
 
-// ============================================================================
-// v5.0 AI 智能分析 (The "Brain") - 容错增强版
-// ============================================================================
+// === AI 智能分析 ===
 
-/**
- * 调用 AI API (带超时和重试，容错增强)
- */
+/** 调用 AI API */
 async function callAI(prompt: string, systemPrompt?: string): Promise<string> {
   const messages = [
     ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
@@ -754,9 +681,7 @@ async function callAI(prompt: string, systemPrompt?: string): Promise<string> {
   return '';
 }
 
-/**
- * v5.0: AI 生成智能报告 (容错版)
- */
+/** AI 生成智能报告 */
 async function generateAIReport(notes: NoteInfo[]): Promise<string> {
   if (notes.length === 0) {
     return '今日未采集到有效内容。';
@@ -801,7 +726,6 @@ ${noteSummaries}
   return `*[AI 分析待补充]*\n\n本次采集了 ${notes.length} 篇笔记，请人工查看 \`data/interview_questions.json\` 进行分析。`;
 }
 
-// 已读笔记标题集合 (用于去重)
 const readNoteTitles = new Set<string>();
 
 /**
@@ -1595,12 +1519,7 @@ async function readNoteByClick(page: Page, index: number, source: string, skipVi
   await simulateReadingInModal(page);
   await randomDelay(2000, 3000);
 
-  // =========================================================================
-  // v5.0 防御性优化: OCR 与看图并行执行 (更自然的行为模式)
-  // =========================================================================
-  // 逻辑: 如果正文短，先启动 OCR (后台)，然后边看图边等 OCR 结果
-  // 好处: 缩短等待时间 + 行为更像真人 (真人不会"先OCR再看图")
-  
+  // OCR 与看图并行执行
   let ocrPromise: Promise<string> | null = null;
   const needOCR = detail.content.length < OCR_CONFIG.MIN_CONTENT_LENGTH;
   
@@ -1845,13 +1764,8 @@ function generateDailyReport(allNotes: NoteInfo[]): string {
   return report;
 }
 
-// ============================================================================
-// AlgoQuest 生态联动 - JSON 数据导出 (v5.0 Ultimate Edition)
-// ============================================================================
+// === AlgoQuest 数据导出 ===
 
-/**
- * v4.1: AlgoQuest 数据结构 (标准化 Schema)
- */
 interface QuestionItem {
   id: string;              // 核心! 笔记唯一ID (用于去重)
   title: string;
@@ -1865,9 +1779,7 @@ interface QuestionItem {
   status: 'pending' | 'imported';  // 处理状态
 }
 
-/**
- * v4.1: 将 NoteInfo 转换为 QuestionItem
- */
+/** NoteInfo 转 QuestionItem */
 function noteToQuestionItem(note: NoteInfo): QuestionItem | null {
   // 必须有有效的 noteId
   if (!note.noteId) {
@@ -1975,9 +1887,7 @@ function saveToDatabase(allNotes: NoteInfo[], dbPath: string): {
   };
 }
 
-// ============================================================================
-// MAIN - 主程序 (v5.0 Ultimate Edition)
-// ============================================================================
+// === 主程序 ===
 
 async function main(): Promise<void> {
   console.log('╔════════════════════════════════════════╗');
