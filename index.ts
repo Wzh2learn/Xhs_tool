@@ -1,9 +1,9 @@
 /**
  * XHS Intelligence Agent - 情报搜集系统 (Phase 2)
  * 
- * 🚀 v5.0 Ultimate Edition
- * - 👁️ OCR 图片识别 (tesseract.js)
- * - 🖐️ 拟人化看图 (模拟翻页)
+ * 🚀 v5.0 Ultimate Edition (Defensive Hardened)
+ * - 👁️ OCR 图片识别 (tesseract.js) + 10s 超时保护
+ * - 🖐️ 拟人化看图 (模拟翻页) + 通用选择器
  * - 🧠 AI 智能分析 (容错增强)
  * - 📚 全明星专家词库 + 智能混合轮询
  * - 增量写入 + 去重 (note_id)
@@ -14,7 +14,16 @@
  * - 关键词间隔 90-180 秒
  * - 随机视口尺寸
  * - 隐藏 webdriver 特征
+ * 
+ * 🛡️ 防御性编程 (Defensive Coding):
+ * - OCR 10 秒超时保护
+ * - 翻页按钮多级回退
+ * - 环境变量 dotenv 支持
+ * - OCR 与看图并行执行
  */
+
+// 加载环境变量 (从 .env 文件)
+import 'dotenv/config';
 
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
@@ -46,11 +55,12 @@ const AI_CONFIG = {
   RETRIES: 2,      // 重试次数
 };
 
-// OCR 配置
+// OCR 配置 (防御性增强)
 const OCR_CONFIG = {
   MIN_CONTENT_LENGTH: 50,  // 正文少于50字时触发 OCR
   MAX_IMAGES: 3,           // 最多识别前3张图
   LANG: 'chi_sim+eng',     // 中英文混合识别
+  TIMEOUT: 10000,          // 单张图 10 秒超时 (防卡死)
 };
 
 // ============================================================================
@@ -533,19 +543,37 @@ function makeSearchURL(keyword: string): string {
 }
 
 // ============================================================================
-// v5.0 OCR 图片识别 (The "Eye")
+// v5.0 OCR 图片识别 (The "Eye") - 防御性增强
 // ============================================================================
 
 /**
- * 从图片 URL 提取文字 (OCR)
+ * 带超时的 Promise 包装器
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+  ]);
+}
+
+/**
+ * 从图片 URL 提取文字 (OCR) - 带 10 秒超时保护
  */
 async function extractTextFromImage(imageUrl: string): Promise<string> {
   try {
     console.log(`   👁️ [OCR] 识别图片: ${imageUrl.substring(0, 50)}...`);
     
-    const result = await Tesseract.recognize(imageUrl, OCR_CONFIG.LANG, {
+    // 核心: 10 秒超时保护，防止脚本卡死
+    const ocrPromise = Tesseract.recognize(imageUrl, OCR_CONFIG.LANG, {
       logger: () => {} // 静默模式
     });
+    
+    const result = await withTimeout(ocrPromise, OCR_CONFIG.TIMEOUT, null);
+    
+    if (!result) {
+      console.log(`   👁️ [OCR] ⏱️ 超时 (>${OCR_CONFIG.TIMEOUT/1000}s)，跳过此图`);
+      return '';
+    }
     
     const text = result.data.text.trim();
     if (text.length > 10) {
@@ -621,64 +649,99 @@ async function extractOCRFromImages(page: Page): Promise<string> {
 }
 
 // ============================================================================
-// v5.0 拟人化看图 (The "Hand")
+// v5.0 拟人化看图 (The "Hand") - 通用选择器 + 优雅容错
 // ============================================================================
 
 /**
- * v5.0: 模拟真人翻看图片
+ * v5.0: 模拟真人翻看图片 (防御性增强)
+ * - 多级选择器回退
+ * - aria-label 无障碍属性
+ * - SVG 图标按钮
+ * - 单图优雅退出
  */
 async function humanViewImages(page: Page): Promise<void> {
   console.log('   🖐️ [ViewImages] 模拟翻看图片...');
   
   try {
-    // 图片轮播"下一张"按钮的可能选择器
+    // 多级选择器策略 (从具体到通用)
     const nextButtonSelectors = [
+      // Level 1: 小红书特定类名
       '.carousel-next',
       '.swiper-button-next',
-      '[class*="next"]',
-      '.image-viewer-next',
       '.note-slider-next',
-      'button[aria-label="next"]',
+      '.image-viewer-next',
       '.slider-arrow-right',
+      
+      // Level 2: aria-label 无障碍属性 (最可靠)
+      '[aria-label="下一张"]',
+      '[aria-label="next"]',
+      '[aria-label="Next"]',
+      'button[aria-label*="next" i]',
+      'button[aria-label*="下一" i]',
+      
+      // Level 3: SVG 图标按钮 (右箭头特征)
+      'button:has(svg[class*="right"])',
+      'button:has(svg[class*="arrow"])',
+      '[class*="next"]:has(svg)',
+      
+      // Level 4: 通用回退
+      '[class*="next"]',
+      '[class*="arrow-right"]',
     ];
     
     let nextButton = null;
+    let foundSelector = '';
+    
     for (const sel of nextButtonSelectors) {
-      nextButton = await page.$(sel);
-      if (nextButton) {
-        console.log(`   🖐️ [ViewImages] 找到翻页按钮: ${sel}`);
-        break;
+      try {
+        nextButton = await page.$(sel);
+        if (nextButton) {
+          // 验证按钮是否可见
+          const isVisible = await nextButton.isVisible();
+          if (isVisible) {
+            foundSelector = sel;
+            break;
+          }
+          nextButton = null; // 不可见，继续找
+        }
+      } catch {
+        // 选择器语法不支持，跳过
+        continue;
       }
     }
     
     if (!nextButton) {
-      // 尝试直接点击图片区域滑动
-      const imageArea = await page.$('.note-slider, .carousel, .swiper-container, [class*="image"]');
+      // 🛡️ 优雅退出: 可能是单图笔记
+      console.log('   🖐️ [ViewImages] 无法翻页 (可能是单图笔记)，跳过');
+      
+      // 备选: 尝试在图片区域简单停留
+      const imageArea = await page.$('.note-slider, .carousel, .swiper-container, [class*="media"]');
       if (imageArea) {
-        console.log('   🖐️ [ViewImages] 未找到按钮，尝试滑动图片区域');
-        // 随机点击 1-2 次
-        const clicks = 1 + Math.floor(Math.random() * 2);
-        for (let i = 0; i < clicks; i++) {
-          await imageArea.click();
-          await delay(800 + Math.random() * 500);
-        }
+        await delay(1000 + Math.random() * 500);
+        console.log('   🖐️ [ViewImages] 在图片区域停留 1s');
       }
       return;
     }
+    
+    console.log(`   🖐️ [ViewImages] 找到翻页按钮: ${foundSelector}`);
     
     // 随机点击 2-4 次 (模拟看多张图)
     const viewCount = 2 + Math.floor(Math.random() * 3);
     console.log(`   🖐️ [ViewImages] 将翻看 ${viewCount} 张图片`);
     
+    let successClicks = 0;
     for (let i = 0; i < viewCount; i++) {
       try {
         await nextButton.click();
+        successClicks++;
         // 每张图看 1-2 秒
         const viewTime = 1000 + Math.random() * 1000;
         await delay(viewTime);
         console.log(`   🖐️ [ViewImages] 看第 ${i + 2} 张图 (${Math.round(viewTime/1000)}s)`);
       } catch {
-        break; // 可能已经到最后一张
+        // 可能已经到最后一张，优雅退出
+        console.log(`   🖐️ [ViewImages] 已到最后一张 (共翻了 ${successClicks} 张)`);
+        break;
       }
     }
     
@@ -1582,18 +1645,35 @@ async function readNoteByClick(page: Page, index: number, source: string, skipVi
   await simulateReadingInModal(page);
   await randomDelay(2000, 3000);
 
-  // v5.0: 模拟翻看图片 (The "Hand")
+  // =========================================================================
+  // v5.0 防御性优化: OCR 与看图并行执行 (更自然的行为模式)
+  // =========================================================================
+  // 逻辑: 如果正文短，先启动 OCR (后台)，然后边看图边等 OCR 结果
+  // 好处: 缩短等待时间 + 行为更像真人 (真人不会"先OCR再看图")
+  
+  let ocrPromise: Promise<string> | null = null;
+  const needOCR = detail.content.length < OCR_CONFIG.MIN_CONTENT_LENGTH;
+  
+  if (needOCR) {
+    console.log(`   👁️ 正文仅 ${detail.content.length} 字，后台启动 OCR...`);
+    // 启动 OCR (不 await)，让它在后台跑
+    ocrPromise = extractOCRFromImages(page);
+  }
+
+  // v5.0: 模拟翻看图片 (The "Hand") - 前台动作
   await humanViewImages(page);
   await randomDelay(1000, 2000);
 
-  // v5.0: 如果正文太短，触发 OCR (The "Eye")
+  // 等待 OCR 结果 (如果有的话)
   let finalContent = detail.content;
-  if (detail.content.length < OCR_CONFIG.MIN_CONTENT_LENGTH) {
-    console.log(`   👁️ 正文仅 ${detail.content.length} 字，触发 OCR 识别...`);
-    const ocrContent = await extractOCRFromImages(page);
+  if (ocrPromise) {
+    console.log(`   👁️ 等待 OCR 结果...`);
+    const ocrContent = await ocrPromise;
     if (ocrContent) {
       finalContent = detail.content + ocrContent;
       console.log(`   👁️ OCR 补充后共 ${finalContent.length} 字`);
+    } else {
+      console.log(`   👁️ OCR 无有效结果`);
     }
   }
 

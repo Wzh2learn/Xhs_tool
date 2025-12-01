@@ -1,6 +1,7 @@
 # 敏感文件 - 绝对不要提交！
 xhs_cookies.json
 *.cookies.json
+.env
 
 # Node.js
 node_modules/
