@@ -1002,7 +1002,7 @@ async function extractDetailContent(page: Page): Promise<{ content: string; tags
     try {
       const element = await page.$(selector);
       if (element) {
-        content = await page.evaluate(el => el.innerText || el.textContent || '', element);
+        content = await page.evaluate(el => (el as HTMLElement).innerText || el.textContent || '', element);
         if (content.trim() && content.length > 20) {
           console.log(`[extractDetailContent] ✓ 选择器命中: ${selector}`);
           break;
@@ -1020,7 +1020,7 @@ async function extractDetailContent(page: Page): Promise<{ content: string; tags
         const candidates = document.querySelectorAll('div, article, section, p');
         let bestText = '';
         for (const el of candidates) {
-          const text = el.innerText || '';
+          const text = (el as HTMLElement).innerText || '';
           // 找到文本最长且合理的元素
           if (text.length > bestText.length && text.length < 5000) {
             // 排除导航、侧边栏等
@@ -1344,7 +1344,7 @@ async function extractFromModal(page: Page): Promise<{
       try {
         const el = await page.$(sel);
         if (el) {
-          const text = await page.evaluate(e => e.innerText || e.textContent || '', el);
+          const text = await page.evaluate(e => (e as HTMLElement).innerText || e.textContent || '', el);
           if (text && text.trim().length > 0) {
             return text.trim();
           }
