@@ -3,6 +3,9 @@
  * 验证模块化重构后所有功能正常
  */
 
+// 静态导入类型 (解决 namespace 问题)
+import type { CommentInfo, NoteInfo, Draft, QuestionItem } from './src/types';
+
 console.log('╔════════════════════════════════════════╗');
 console.log('║  v5.0 完整功能测试                     ║');
 console.log('╚════════════════════════════════════════╝');
@@ -82,12 +85,12 @@ async function runTests() {
   const types = await import('./src/types');
   
   test('CommentInfo 类型可构造', () => {
-    const c: types.CommentInfo = { author: 'a', content: 'b', likes: '1' };
+    const c: CommentInfo = { author: 'a', content: 'b', likes: '1' };
     return c.author === 'a';
   });
   
   test('NoteInfo 类型完整', () => {
-    const n: types.NoteInfo = {
+    const n: NoteInfo = {
       keyword: 'k', title: 't', author: 'a', authorLink: 'l',
       likes: '0', link: 'url', noteId: 'id', content: 'c',
       fullContent: 'fc', tags: [], comments: []
@@ -96,12 +99,12 @@ async function runTests() {
   });
   
   test('Draft 类型完整', () => {
-    const d: types.Draft = { title: 't', content: 'c', tags: [], imagePaths: [] };
+    const d: Draft = { title: 't', content: 'c', tags: [], imagePaths: [] };
     return Array.isArray(d.imagePaths);
   });
   
   test('QuestionItem 类型完整', () => {
-    const q: types.QuestionItem = {
+    const q: QuestionItem = {
       id: 'id', title: 't', link: 'l', tags: [], summary: 's',
       full_text: 'ft', hot_comments: [], source_author: 'a',
       crawled_at: new Date().toISOString(), status: 'pending'
@@ -211,7 +214,7 @@ async function runTests() {
   const db = await import('./src/database');
   
   test('noteToQuestionItem 转换有效笔记', () => {
-    const note: types.NoteInfo = {
+    const note: NoteInfo = {
       keyword: '算法面试', title: '测试', author: 'test',
       authorLink: '', likes: '100', link: 'https://test.com',
       noteId: 'abc123', content: '内容', fullContent: '',
@@ -222,7 +225,7 @@ async function runTests() {
   });
   
   test('noteToQuestionItem 拒绝无 noteId', () => {
-    const note: types.NoteInfo = {
+    const note: NoteInfo = {
       keyword: '算法', title: '', author: '', authorLink: '',
       likes: '', link: '', noteId: '', content: '',
       fullContent: '', tags: [], comments: []
@@ -231,7 +234,7 @@ async function runTests() {
   });
   
   test('noteToQuestionItem 拒绝无关内容', () => {
-    const note: types.NoteInfo = {
+    const note: NoteInfo = {
       keyword: '旅游攻略', title: '好玩', author: 'test',
       authorLink: '', likes: '10', link: 'url',
       noteId: 'xyz789', content: '旅游', fullContent: '',

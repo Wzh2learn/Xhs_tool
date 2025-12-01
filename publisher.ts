@@ -131,7 +131,7 @@ async function findTextboxByPlaceholder(page: Page): Promise<ElementHandle<Eleme
     const textbox = await page.evaluateHandle((elem) => {
       let current: Element | null = elem;
       for (let i = 0; i < 5; i++) {
-        const parent = current?.parentElement;
+        const parent: Element | null = current?.parentElement ?? null;
         if (!parent) break;
 
         if (parent.getAttribute('role') === 'textbox') {
