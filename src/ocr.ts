@@ -8,7 +8,7 @@ import { delay, withTimeout } from './utils';
 import { logger } from './logger';
 
 /** 从图片 URL 提取文字 (OCR) */
-export async function extractTextFromImage(imageUrl: string): Promise<string> {
+export async function recognizeImage(imageUrl: string): Promise<string> {
   try {
     logger.debug(`   👁️ [OCR] 识别图片: ${imageUrl.substring(0, 50)}...`);
     
