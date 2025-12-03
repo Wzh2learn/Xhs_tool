@@ -18,7 +18,10 @@ export function noteToQuestionItem(note: NoteInfo): QuestionItem | null {
                      note.keyword.includes('广告') ||
                      note.keyword.includes('面试') ||
                      note.keyword.includes('面经') ||
-                     note.keyword.includes('实习');
+                     note.keyword.includes('实习') ||
+                     note.keyword.includes('Feed') ||
+                     note.keyword.includes('模型') ||
+                     note.keyword.includes('大厂');
   
   if (!isRelevant) {
     return null;
@@ -31,7 +34,7 @@ export function noteToQuestionItem(note: NoteInfo): QuestionItem | null {
     tags: note.tags.length > 0 ? note.tags : [note.keyword],
     summary: note.content.substring(0, 300),
     full_text: note.fullContent || note.content,
-    hot_comments: note.comments.map(c => `${c.author}: ${c.content}`).slice(0, 5),
+    hot_comments: note.comments.map(c => `[👍${c.likes}] ${c.author}: ${c.content}`).slice(0, 5),
     source_author: note.author,
     crawled_at: new Date().toISOString(),
     status: 'pending',
