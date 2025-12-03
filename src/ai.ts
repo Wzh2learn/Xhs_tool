@@ -60,6 +60,43 @@ export async function callAI(prompt: string, systemPrompt?: string): Promise<str
   return '';
 }
 
+/** AI 扩展搜索关键词 */
+export async function expandKeywordsWithAI(baseKeywords: string[]): Promise<string[]> {
+  if (!AI_CONFIG.isConfigured) {
+    return baseKeywords;
+  }
+
+  logger.info('[AI] 🧠 正在生成扩展关键词...');
+
+  const prompt = `你是搜广推算法面试专家。基于以下关键词，生成3个更精准的小红书搜索词（用于找面试经验帖）：
+
+基础词: ${baseKeywords.join(', ')}
+
+要求：
+1. 每个搜索词2-4个字，简洁有力
+2. 聚焦"面试"、"实习"、"校招"场景
+3. 直接输出3个词，用逗号分隔，不要解释`;
+
+  try {
+    const result = await callAI(prompt);
+    if (result) {
+      const expanded = result.split(/[,，、\n]/)
+        .map(s => s.trim())
+        .filter(s => s.length >= 2 && s.length <= 10)
+        .slice(0, 3);
+      
+      if (expanded.length > 0) {
+        logger.info(`[AI] 🧠 ✅ 扩展词: ${expanded.join(', ')}`);
+        return [...baseKeywords, ...expanded];
+      }
+    }
+  } catch (error: any) {
+    logger.warn(`[AI] 🧠 ⚠️ 扩展失败: ${error.message || '未知错误'}`);
+  }
+
+  return baseKeywords;
+}
+
 /** AI 生成智能报告 */
 export async function generateAIReport(notes: NoteInfo[]): Promise<string> {
   if (notes.length === 0) {

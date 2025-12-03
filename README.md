@@ -2,21 +2,22 @@
 
 > 基于 Puppeteer 移植 [xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) (Go) 核心逻辑的小红书自动发布工具，专为"搜广推算法实习生"人设打造的内容运营解决方案。
 
-**🚀 v5.0 Ultimate Edition** - OCR + 看图 + AI 分析
+**🚀 v5.1 Fixed Edition** - Feed流穿插 + 视频检测 + AI关键词扩展
 
 ---
 
 ## 🎯 核心特性 (Features)
 
-### ✅ v5.0 新功能
+### ✅ v5.1 新功能
 
 | 功能 | 说明 |
 |------|------|
-| 👁️ **OCR 图片识别** | 正文 < 50 字时自动识别图片文字 (tesseract.js) |
-| 🖐️ **拟人化看图** | 模拟翻看图片 2-4 张，每张 1-2 秒 |
-| 🧠 **AI 智能分析** | 自动提取面试题 + 技术热点 (支持自定义 API) |
-| 📚 **专家词库** | 49 个精选关键词，智能混合轮询 |
-| 🛡️ **防御性编程** | 10s OCR 超时 + 全局错误处理 + dotenv 支持 |
+| 📱 **Feed流穿插** | 搜索间随机穿插2次Feed流浏览，获取1-2篇笔记 |
+| 🎬 **视频检测** | 自动识别视频笔记，模拟观看但不记录内容 |
+| 🧠 **AI关键词扩展** | DeepSeek 智能扩展搜索关键词 |
+| 💬 **评论抓取** | 提取热门评论 Top 3 |
+| 📅 **日期日报** | 日报文件自动带日期命名 `daily_2025-12-03.md` |
+| ⏱️ **优化时序** | 停留15-30s，搜索间隔20-40s |
 
 ### ✅ Deep Dive Analysis (深度分析)
 - 自动抓取笔记**正文全文** + **Top 5 热评**
@@ -33,10 +34,11 @@
 ### ✅ Human-Simulation (拟人防检测)
 - 🖱️ **贝塞尔曲线鼠标轨迹**：自然的鼠标移动路径
 - ⌨️ **变速打字**：80-200ms/字，偶尔"思考"停顿
-- 🐢 **慢用户模式**：关键词间隔 90-180 秒
-- 👀 **随机回看**：模拟真人阅读时的"往回看"行为
+- 📱 **Feed流穿插**：搜索间随机刷首页，更自然
+- ⏱️ **真人停留**：每篇笔记停留 15-30 秒
+- 🔀 **随机间隔**：关键词搜索间隔 20-40 秒
 - 👤 **指纹隐藏**：随机视口 + webdriver 特征移除
-- 🖼️ **v5.0 看图模拟**：自动翻看多图笔记
+- 🎬 **视频处理**：检测视频笔记，观看但不记录
 
 ### ✅ 其他特性
 - **Copy-Paste Engineering**: 直接移植 MCP 项目的页面交互逻辑
@@ -78,12 +80,13 @@ cp .env.example .env
 
 `.env` 文件内容：
 ```env
-AI_API_BASE=https://api.openai.com/v1
-AI_API_KEY=sk-your-api-key
-AI_MODEL=gpt-3.5-turbo
+# DeepSeek API 配置
+DEEPSEEK_API_KEY=sk-your-deepseek-key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
-> 💡 不配置也能运行，会使用默认 API
+> 💡 不配置 AI 也能运行，会跳过 AI 关键词扩展和智能分析
 
 ### 3. 获取登录凭证 (Cookie)
 
@@ -106,17 +109,20 @@ npx tsx index.ts
 ```
 
 **自动执行**：
-1. 搜索关键词 → 点击阅读笔记
-2. 拓取正文 + 热评 → 生成日报
-3. 增量保存到 JSON 题库
+1. AI 扩展关键词（启动前完成）
+2. 进入小红书首页 → 加载 Cookie
+3. 搜索关键词 → 点击阅读笔记（15-30s/篇）
+4. 随机穿插 Feed 流浏览（2次）
+5. 提取正文 + 热评 Top3 → 生成日报
+6. 增量保存到 JSON 题库
 
 **产出文件**：
-- `reports/daily_trends.md` - 可读日报
+- `reports/daily_2025-12-03.md` - 带日期的可读日报
 - `data/interview_questions.json` - 结构化题库
 
-**耗时**：约 15-20 分钟（慢用户模式）
+**耗时**：约 8-12 分钟（3个关键词 × 3篇 + 2次Feed流）
 
-> 🚀 **v5.0 Ultimate**: OCR 图片识别 + 拟人看图 + AI 智能分析
+> 🚀 **v5.1**: Feed流穿插 + 视频检测 + AI关键词扩展 + 评论抓取
 
 ### 5. 准备内容
 
@@ -306,7 +312,8 @@ d:\AIlearn\xhs_automation\error_screenshot.png
 - [x] **Phase 3**: 发布系统 (MCP 逻辑移植)
 - [x] **Phase 4**: 安全加固 (贝塞尔鼠标 + 变速打字)
 - [x] **Phase 5**: 智能升级 (OCR + AI 分析)
-- [x] **Phase 6**: 模块化重构 (src/ 拆分, 43 项测试覆盖)
+- [x] **Phase 6**: 模块化重构 (src/ 拆分)
+- [x] **Phase 7**: 行为优化 (Feed流穿插 + 视频检测 + DeepSeek集成)
 
 ---
 

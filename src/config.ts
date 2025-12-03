@@ -20,13 +20,12 @@ export const PUBLISHED_DIR = path.join(PROJECT_ROOT, 'content/published');
   }
 });
 
-// === AI API 配置 ===
-// ⚠️ API Key 必须通过环境变量配置，不在代码中硬编码
+// === AI API 配置 (DeepSeek) ===
 export const AI_CONFIG = {
-  API_BASE: process.env.AI_API_BASE || 'https://yinli.one/v1',
-  API_KEY: process.env.AI_API_KEY || '',  // 必须在 .env 中配置
-  MODEL: process.env.AI_MODEL || 'gemini-2.5-flash',
-  TIMEOUT: 30000,
+  API_BASE: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+  API_KEY: process.env.DEEPSEEK_API_KEY || '',
+  MODEL: process.env.DEEPSEEK_MODEL || 'deepseek-reasoner',
+  TIMEOUT: 60000,  // reasoner 模型可能需要更长时间
   RETRIES: 2,
   get isConfigured(): boolean {
     return !!this.API_KEY;
@@ -41,22 +40,38 @@ export const OCR_CONFIG = {
   TIMEOUT: 10000,
 };
 
-// === 安全配置 (模拟慢用户) ===
+// === 安全配置 (模拟真实用户行为) ===
+// 核心原则：像真人一样操作，不要太快也不要太慢
 export const SAFETY_CONFIG = {
-  PAGE_LOAD_WAIT_MIN: 3000,
-  PAGE_LOAD_WAIT_MAX: 6000,
-  SCROLL_INTERVAL_MIN: 1200,
-  SCROLL_INTERVAL_MAX: 2500,
+  // 页面加载等待 (2-4秒，模拟真人等待加载)
+  PAGE_LOAD_WAIT_MIN: 2000,
+  PAGE_LOAD_WAIT_MAX: 4000,
+  
+  // 滚动行为 (0.8-2秒一次，模拟阅读)
+  SCROLL_INTERVAL_MIN: 800,
+  SCROLL_INTERVAL_MAX: 2000,
   SCROLL_TIMES_MIN: 2,
   SCROLL_TIMES_MAX: 4,
-  DETAIL_READ_MIN: 8000,
-  DETAIL_READ_MAX: 15000,
-  KEYWORD_INTERVAL_MIN: 90000,
-  KEYWORD_INTERVAL_MAX: 180000,
-  NOTE_INTERVAL_MIN: 8000,
-  NOTE_INTERVAL_MAX: 15000,
-  TYPING_DELAY_MIN: 80,
-  TYPING_DELAY_MAX: 200,
+  
+  // 详情页阅读时间 (15-30秒，模拟真人阅读)
+  DETAIL_READ_MIN: 15000,
+  DETAIL_READ_MAX: 30000,
+  
+  // 关键词搜索间隔 (20-40秒)
+  KEYWORD_INTERVAL_MIN: 20000,
+  KEYWORD_INTERVAL_MAX: 40000,
+  
+  // 笔记间隔 (5-10秒，模拟翻阅)
+  NOTE_INTERVAL_MIN: 5000,
+  NOTE_INTERVAL_MAX: 10000,
+  
+  // 打字速度 (50-150ms，模拟真人打字)
+  TYPING_DELAY_MIN: 50,
+  TYPING_DELAY_MAX: 150,
+  
+  // 每日采集上限 (不要贪心)
+  MAX_NOTES_PER_KEYWORD: 3,
+  MAX_KEYWORDS_PER_SESSION: 5,
 };
 
 // === 内容配置 ===
