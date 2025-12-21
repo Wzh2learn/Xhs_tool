@@ -25,3 +25,7 @@ export * from './database';
 
 // 日志
 export * from './logger';
+
+// Agents
+export * from './agents/searchAgent';
+export * from './agents/feedAgent';

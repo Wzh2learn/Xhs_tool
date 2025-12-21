@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XHS Command Center</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="status-bar">
+      <div class="brand">XHS / Command Center</div>
+      <div class="badges">
+        <span class="badge" id="conn-status">WS: connecting...</span>
+        <span class="badge" id="run-status">Idle</span>
+      </div>
+    </header>
+
+    <section class="controls">
+      <button class="action-btn" id="btn-login">🔑 Login (v3)</button>
+      <button class="action-btn" id="btn-scout">🕵️ Scout (Intelligence)</button>
+      <button class="action-btn" id="btn-publish">🚀 Publish (Distribution)</button>
+      <button class="action-btn danger" id="btn-kill">⛔ Kill Task</button>
+    </section>
+
+    <section class="terminal-card">
+      <div class="card-head">
+        <div class="title">Live Terminal</div>
+        <div class="actions">
+          <button class="chip" id="clear-log">Clear</button>
+        </div>
+      </div>
+      <pre id="terminal" class="terminal"></pre>
+    </section>
+
+    <section class="tabs-card">
+      <div class="tabs">
+        <button class="tab active" data-tab="report">📄 Daily Report</button>
+        <button class="tab" data-tab="database">💾 Database</button>
+      </div>
+      <div class="tab-body" id="tab-report">
+        <div id="report" class="markdown"></div>
+      </div>
+      <div class="tab-body hidden" id="tab-database">
+        <pre id="database" class="json-view"></pre>
+      </div>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/marked/marked.min.js"></script>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -6,19 +6,16 @@
 
 ---
 
-## 🌅 09:00 情报搜集 (The Scout)
+## 🌅 09:00 情报搜集 (The Scout) — Dashboard 流程
 
-### 执行命令
-
-```bash
-cd d:\AIlearn\xhs_automation
-npx tsx index.ts
-```
+1. 打开 Dashboard: `http://localhost:3000` → 确认 WS Online。
+2. 点击 **🕵️ Scout**，终端开始滚动日志。
+3. 去喝咖啡，等待完成提示。
 
 ### 产出
 
-- **日报文件**: `reports/daily_trends.md`
-- **题库文件**: `data/interview_questions.json`
+- **日报文件**: `reports/daily_YYYY-MM-DD.md` （Dashboard 底部 **Daily Report** 标签页可直接预览）
+- **题库文件**: `data/interview_questions.json` （Dashboard 底部 **Database** 标签页可直接预览）
 - **内容**: 3 个关键词 × 3 篇笔记 + 2 次 Feed 推荐 (各1-2篇) = **约 12 篇笔记**
 - **每篇包含**: 
   - 标题、作者、点赞数、标签
@@ -27,22 +24,19 @@ npx tsx index.ts
   - **🧠 AI 智能分析** (提取核心面试题)
 
 ### 耗时
-
 约 **8-12 分钟**（v5.1 优化时序：搜索间隔20-40s + Feed穿插）
 
 ### 🎯 心态
-
-> 💡 **不要盯着看！** 启动后挂后台运行，去吃早餐、看新闻、泡杯咖啡。
-> 脚本会自动完成数据采集和入库。
+> 💡 **不要盯着看！** 挂后台运行，日志会实时推送到 Dashboard。
 
 ---
 
-## ✍️ 09:15 实习生拆题
+## ✍️ 09:20 实习生拆题
 
 ### 关键动作
 
-1. **打开日报**：`reports/daily_trends.md`
-2. **阅读正文摘要**：快速浏览 7 篇笔记的内容摘要
+1. **打开 Dashboard → Database 标签**：直接查看 `data/interview_questions.json`
+2. **阅读日报摘要**：Dashboard → Daily Report 标签
 3. **🔥 重点：阅读"💬 社区热议"板块**：
    - 评论区的追问往往是**最高价值的面试考点**
    - 例如：如果大家都在问"Embedding 维度是多少？"——这就是你笔记必须回答的问题
@@ -117,7 +111,7 @@ content/drafts/
 
 ### 关键动作
 
-1. **打开 JSON 数据**：`data/interview_questions.json`
+1. **打开 JSON 数据**：Dashboard → Database 标签（无需手动打开文件）
 2. **挑选 1-2 道高质量问题**：
    - 优先选择 `hot_comments` 有追问的题目
    - 这些追问往往是面试官真正关心的细节
@@ -151,16 +145,14 @@ content/drafts/
 
 ---
 
-## 🚀 09:50 自动发布
+## 🚀 09:30 自动发布
 
-### 执行命令
-
-```bash
-npx tsx publisher.ts
-```
+### Dashboard 操作
+1. 确认草稿已放在 `content/drafts/`（MD+同名图片）。
+2. 打开 Dashboard，点击 **🚀 Publish**。
+3. 观察终端日志，等待成功提示。
 
 ### 自动流程
-
 1. 扫描 `content/drafts/` 目录
 2. 读取 `.md` 文件 + 同名图片
 3. 打开浏览器 → 上传图片 → 填写标题/正文/标签

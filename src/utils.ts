@@ -5,6 +5,7 @@ import { Page } from 'puppeteer';
 import * as fs from 'fs';
 import { SAFETY_CONFIG, COOKIES_PATH } from './config';
 import { logger } from './logger';
+import UserAgent from 'user-agents';
 
 // === 延时函数 ===
 
@@ -15,6 +16,40 @@ export function delay(ms: number): Promise<void> {
 export function randomDelay(min: number, max: number): Promise<void> {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return delay(ms);
+}
+
+// === Stealth / 指纹伪装 ===
+
+const VIEWPORT_PRESETS = [
+  { width: 1366, height: 768 },
+  { width: 1440, height: 900 },
+  { width: 1536, height: 864 },
+  { width: 1600, height: 900 },
+  { width: 1920, height: 1080 },
+];
+
+function getRandomViewport() {
+  const preset = VIEWPORT_PRESETS[Math.floor(Math.random() * VIEWPORT_PRESETS.length)];
+  const jitter = () => Math.floor(Math.random() * 80) - 40; // ±40 抖动
+  return {
+    width: preset.width + jitter(),
+    height: preset.height + jitter(),
+  };
+}
+
+export async function applyStealthProfile(page: Page, opts?: { userAgent?: string; viewport?: { width: number; height: number } }): Promise<void> {
+  const ua = opts?.userAgent || new UserAgent({ deviceCategory: 'desktop' }).toString();
+  await page.setUserAgent(ua);
+
+  const viewport = opts?.viewport || getRandomViewport();
+  // puppeteer-extra 默认 newPage 会有 viewport，覆盖为随机桌面尺寸
+  await page.setViewport(viewport);
+
+  // 进一步隐藏 webdriver 特征
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    (window as any).chrome = { runtime: {} };
+  });
 }
 
 /** 带超时的 Promise 包装器 */
@@ -144,15 +179,30 @@ export async function humanScroll(page: Page): Promise<void> {
 
 export async function loadCookies(page: Page): Promise<boolean> {
   if (!fs.existsSync(COOKIES_PATH)) {
-    console.warn('[loadCookies] Cookie 文件不存在，请先运行 login.ts');
+    logger.warn('[loadCookies] Cookie 文件不存在，请先运行 login.ts');
     return false;
   }
 
-  const cookiesData = fs.readFileSync(COOKIES_PATH, 'utf-8');
-  const cookies = JSON.parse(cookiesData);
-  await page.setCookie(...cookies);
-  logger.info(`[loadCookies] 已加载 ${cookies.length} 个 Cookie`);
-  return true;
+  try {
+    const cookiesData = fs.readFileSync(COOKIES_PATH, 'utf-8');
+    if (!cookiesData.trim()) {
+      logger.warn('[loadCookies] Cookie 文件为空');
+      return false;
+    }
+
+    const cookies = JSON.parse(cookiesData);
+    if (!Array.isArray(cookies) || cookies.length === 0) {
+      logger.warn('[loadCookies] Cookie 数据格式不正确或为空数组');
+      return false;
+    }
+
+    await page.setCookie(...cookies);
+    logger.info(`[loadCookies] 已加载 ${cookies.length} 个 Cookie`);
+    return true;
+  } catch (err: any) {
+    logger.error(`[loadCookies] Cookie 解析/加载失败: ${err?.message || err}`);
+    return false;
+  }
 }
 
 // === URL 工具 ===

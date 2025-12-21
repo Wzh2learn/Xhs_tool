@@ -9,12 +9,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // 从模块导入
-import { COOKIES_PATH, DRAFTS_DIR, PUBLISHED_DIR, PROJECT_ROOT } from './src/config';
+import { DRAFTS_DIR, PUBLISHED_DIR, PROJECT_ROOT, SAFETY_CONFIG } from './src/config';
 import { PUBLISH_SELECTORS } from './src/selectors';
 import { Draft } from './src/types';
-import { delay } from './src/utils';
+import { delay, randomDelay, applyStealthProfile, humanType, loadCookies } from './src/utils';
+import { Logger } from './src/logger';
 
 puppeteerExtra.use(StealthPlugin());
+const logger = new Logger('Publisher');
 
 // 选择器别名 (兼容旧代码)
 const SELECTORS = PUBLISH_SELECTORS
@@ -29,14 +31,14 @@ export async function removePopCover(page: Page): Promise<void> {
         const elem = document.querySelector(selector);
         if (elem) elem.remove();
       }, SELECTORS.POPOVER);
-      console.log('[removePopCover] 已移除弹窗遮挡层');
+      logger.info('[removePopCover] 已移除弹窗遮挡层');
     }
 
     // 兜底：点击空白区域 (publish.go:94-98)
     // Go 源码: x := 380 + rand.Intn(100), y := 20 + rand.Intn(60)
     await clickEmptyPosition(page);
   } catch (error) {
-    console.warn('[removePopCover] 处理弹窗时出错:', error);
+    logger.warn('[removePopCover] 处理弹窗时出错:', error);
   }
 }
 
@@ -68,7 +70,7 @@ export async function waitForUploadComplete(
   maxWaitMs: number = 60000,
   checkIntervalMs: number = 500
 ): Promise<void> {
-  console.log(`[waitForUploadComplete] 开始等待图片上传完成, 期望数量: ${expectedCount}`);
+  logger.info(`[waitForUploadComplete] 开始等待图片上传完成, 期望数量: ${expectedCount}`);
 
   const startTime = Date.now();
 
@@ -78,17 +80,17 @@ export async function waitForUploadComplete(
       const uploadedImages = await page.$$(SELECTORS.UPLOAD_COMPLETE_ITEM);
       const currentCount = uploadedImages.length;
 
-      console.log(`[waitForUploadComplete] 当前已上传: ${currentCount}/${expectedCount}`);
+      logger.info(`[waitForUploadComplete] 当前已上传: ${currentCount}/${expectedCount}`);
 
       if (currentCount >= expectedCount) {
-        console.log(`[waitForUploadComplete] 所有图片上传完成, 数量: ${currentCount}`);
+        logger.info(`[waitForUploadComplete] 所有图片上传完成, 数量: ${currentCount}`);
         return;
       }
     } catch (error) {
-      console.debug('[waitForUploadComplete] 未找到已上传图片元素');
+      logger.debug?.('[waitForUploadComplete] 未找到已上传图片元素');
     }
 
-    await delay(checkIntervalMs);
+    await randomDelay(checkIntervalMs, checkIntervalMs + 150);
   }
 
   throw new Error(`上传超时 (${maxWaitMs}ms)，请检查网络连接和图片大小`);
@@ -96,14 +98,14 @@ export async function waitForUploadComplete(
 
 /** 获取正文编辑器 (publish.go:269-292, Race 双策略) */
 export async function getContentEditor(page: Page): Promise<ElementHandle<Element>> {
-  console.log('[getContentEditor] 开始查找正文编辑器...');
+  logger.info('[getContentEditor] 开始查找正文编辑器...');
 
   // 方案一: Quill 编辑器 (publish.go:274)
   const qlEditor = await page.$(SELECTORS.CONTENT_EDITOR_V1);
   if (qlEditor) {
     const visible = await isElementVisible(page, qlEditor);
     if (visible) {
-      console.log('[getContentEditor] 找到 Quill 编辑器 (div.ql-editor)');
+      logger.info('[getContentEditor] 找到 Quill 编辑器 (div.ql-editor)');
       return qlEditor;
     }
   }
@@ -111,7 +113,7 @@ export async function getContentEditor(page: Page): Promise<ElementHandle<Elemen
   // 方案二: Textbox (publish.go:278-284, 354-410)
   const textboxEditor = await findTextboxByPlaceholder(page);
   if (textboxEditor) {
-    console.log('[getContentEditor] 找到 Textbox 编辑器 (role=textbox)');
+    logger.info('[getContentEditor] 找到 Textbox 编辑器 (role=textbox)');
     return textboxEditor;
   }
 
@@ -150,7 +152,7 @@ async function findTextboxByPlaceholder(page: Page): Promise<ElementHandle<Eleme
 
     return null;
   } catch (error) {
-    console.debug('[findTextboxByPlaceholder] 查找失败:', error);
+    logger.debug?.('[findTextboxByPlaceholder] 查找失败:', error);
     return null;
   }
 }
@@ -183,7 +185,7 @@ async function isElementVisible(page: Page, element: ElementHandle): Promise<boo
 
 /** 点击发布 Tab (publish.go:100-134) */
 export async function clickPublishTab(page: Page, tabName: string): Promise<void> {
-  console.log(`[clickPublishTab] 尝试点击 Tab: "${tabName}"`);
+  logger.info(`[clickPublishTab] 尝试点击 Tab: "${tabName}"`);
 
   // 等待容器 (publish.go:101)
   await page.waitForSelector(SELECTORS.UPLOAD_CONTAINER, { visible: true });
@@ -206,19 +208,19 @@ export async function clickPublishTab(page: Page, tabName: string): Promise<void
       // 检查是否被遮挡 (publish.go:157-162)
       const blocked = await isElementBlocked(page, tab);
       if (blocked) {
-        console.log('[clickPublishTab] Tab 被遮挡，尝试移除遮挡');
+        logger.info('[clickPublishTab] Tab 被遮挡，尝试移除遮挡');
         await removePopCover(page);
-        await delay(200);
+        await randomDelay(180, 360);
         continue;
       }
 
       // 点击 Tab (publish.go:124)
       await tab.click();
-      console.log(`[clickPublishTab] 成功点击 Tab: "${tabName}"`);
+      logger.info(`[clickPublishTab] 成功点击 Tab: "${tabName}"`);
       return;
     }
 
-    await delay(200);
+    await randomDelay(180, 360);
   }
 
   throw new Error(`没有找到发布 Tab: "${tabName}"`);
@@ -286,28 +288,26 @@ async function typeContentLineByLine(
   const formattedContent = formatContentForXHS(content);
   const lines = formattedContent.split('\n');
 
-  console.log(`[typeContentLineByLine] 开始逐行输入, 共 ${lines.length} 行`);
+  logger.info(`[typeContentLineByLine] 开始逐行输入, 共 ${lines.length} 行`);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     if (line.trim() === '') {
-      // 空行: 直接按 Enter
       await page.keyboard.press('Enter');
     } else {
-      // 有内容: 输入文字后按 Enter
-      await contentEditor.type(line, { delay: 20 });
-      // 最后一行不需要按 Enter
+      for (const char of line) {
+        await contentEditor.type(char, { delay: SAFETY_CONFIG.TYPING_DELAY_MIN + Math.random() * (SAFETY_CONFIG.TYPING_DELAY_MAX - SAFETY_CONFIG.TYPING_DELAY_MIN) });
+      }
       if (i < lines.length - 1) {
         await page.keyboard.press('Enter');
       }
     }
 
-    // 每行之间稍微等待，模拟真人输入
-    await delay(50);
+    await randomDelay(40, 140);
   }
 
-  console.log('[typeContentLineByLine] 正文输入完成');
+  logger.info('[typeContentLineByLine] 正文输入完成');
 }
 
 // === 核心业务逻辑 ===
@@ -328,19 +328,19 @@ export async function inputTags(
     console.warn('[inputTags] 标签数量超过10，已截取前10个');
   }
 
-  console.log(`[inputTags] 开始输入 ${limitedTags.length} 个标签`);
+  logger.info(`[inputTags] 开始输入 ${limitedTags.length} 个标签`);
 
   // Step 1: 按 20 次 ArrowDown 确保光标在末尾 (publish.go:301-306)
   await contentEditor.click();
   for (let i = 0; i < 20; i++) {
     await page.keyboard.press('ArrowDown');
-    await delay(10);  // publish.go:305 - 10ms 间隔
+    await randomDelay(35, 120);
   }
 
   // Step 2: 按 2 次 Enter 换行 (publish.go:308-311)
   await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
-  await delay(1000);  // publish.go:313
+  await randomDelay(800, 1300);
 
   // Step 3: 逐个输入标签 (publish.go:315-318)
   for (const tag of limitedTags) {
@@ -357,49 +357,49 @@ async function inputSingleTag(
   // 去除标签前的 # (publish.go:322)
   const cleanTag = tag.replace(/^#/, '');
 
-  console.log(`[inputSingleTag] 输入标签: "${cleanTag}"`);
+  logger.info(`[inputSingleTag] 输入标签: "${cleanTag}"`);
 
   // 输入 "#" (publish.go:323)
   await contentEditor.type('#');
-  await delay(200);  // publish.go:324
+  await randomDelay(180, 320);
 
   // 逐字符输入标签名 (publish.go:326-329)
   for (const char of cleanTag) {
-    await contentEditor.type(char);
-    await delay(50);  // publish.go:328 - 50ms 间隔
+    await contentEditor.type(char, { delay: SAFETY_CONFIG.TYPING_DELAY_MIN + Math.random() * (SAFETY_CONFIG.TYPING_DELAY_MAX - SAFETY_CONFIG.TYPING_DELAY_MIN) });
+    await randomDelay(30, 90);
   }
 
   // 等待联想菜单出现 (publish.go:330)
-  await delay(1000);
+  await randomDelay(800, 1300);
 
   // 尝试点击联想结果 (publish.go:332-349)
   try {
     const tagItem = await page.$(SELECTORS.TAG_ITEM);
     if (tagItem) {
       await tagItem.click();
-      console.log(`[inputSingleTag] 成功点击标签联想: "${cleanTag}"`);
-      await delay(200);  // publish.go:339
+      logger.info(`[inputSingleTag] 成功点击标签联想: "${cleanTag}"`);
+      await randomDelay(180, 320);
     } else {
       // 无联想，输入空格结束 (publish.go:341-343)
-      console.warn(`[inputSingleTag] 未找到联想选项，输入空格结束: "${cleanTag}"`);
+      logger.warn(`[inputSingleTag] 未找到联想选项，输入空格结束: "${cleanTag}"`);
       await contentEditor.type(' ');
     }
   } catch (error) {
     // 查找失败，输入空格结束 (publish.go:345-348)
-    console.warn(`[inputSingleTag] 联想查找失败，输入空格结束: "${cleanTag}"`);
+    logger.warn(`[inputSingleTag] 联想查找失败，输入空格结束: "${cleanTag}"`);
     await contentEditor.type(' ');
   }
 
-  await delay(500);  // publish.go:351 - 等待标签处理完成
+  await randomDelay(420, 680);
 }
 
 /** 发布笔记主流程 (publish.go:53-77) */
 export async function publishNote(page: Page, draft: Draft): Promise<void> {
-  console.log('========================================');
-  console.log(`[publishNote] 开始发布: "${draft.title}"`);
-  console.log(`[publishNote] 图片数量: ${draft.imagePaths.length}`);
-  console.log(`[publishNote] 标签: ${draft.tags.join(', ')}`);
-  console.log('========================================');
+  logger.info('========================================');
+  logger.info(`[publishNote] 开始发布: "${draft.title}"`);
+  logger.info(`[publishNote] 图片数量: ${draft.imagePaths.length}`);
+  logger.info(`[publishNote] 标签: ${draft.tags.join(', ')}`);
+  logger.info('========================================');
 
   // 验证图片 (publish.go:54-56)
   if (draft.imagePaths.length === 0) {
@@ -407,17 +407,17 @@ export async function publishNote(page: Page, draft: Draft): Promise<void> {
   }
 
   // Step 1: 导航到发布页 (publish.go:38)
-  console.log('[publishNote] Step 1: 导航到发布页...');
+  logger.info('[publishNote] Step 1: 导航到发布页...');
   await page.goto(SELECTORS.PUBLISH_URL, { waitUntil: 'networkidle2' });
-  await delay(1000);  // publish.go:39
+  await randomDelay(SAFETY_CONFIG.PAGE_LOAD_WAIT_MIN, SAFETY_CONFIG.PAGE_LOAD_WAIT_MAX);
 
   // Step 2: 处理弹窗 + 点击 Tab (publish.go:41-46)
-  console.log('[publishNote] Step 2: 点击上传图文 Tab...');
+  logger.info('[publishNote] Step 2: 点击上传图文 Tab...');
   await clickPublishTab(page, '上传图文');
-  await delay(1000);  // publish.go:46
+  await randomDelay(800, 1300);
 
   // Step 3: 上传图片 (publish.go:60-62)
-  console.log('[publishNote] Step 3: 上传图片...');
+  logger.info('[publishNote] Step 3: 上传图片...');
   const uploadInput = await page.$(SELECTORS.UPLOAD_INPUT);
   if (!uploadInput) {
     throw new Error('未找到图片上传输入框');
@@ -426,42 +426,37 @@ export async function publishNote(page: Page, draft: Draft): Promise<void> {
   await (uploadInput as ElementHandle<HTMLInputElement>).uploadFile(...draft.imagePaths);
 
   // Step 4: 等待上传完成 (publish.go:60-62 调用 uploadImages)
-  console.log('[publishNote] Step 4: 等待图片上传完成...');
+  logger.info('[publishNote] Step 4: 等待图片上传完成...');
   await waitForUploadComplete(page, draft.imagePaths.length);
 
   // Step 5: 输入标题 (v4.1 - 人类打字速度)
-  console.log('[publishNote] Step 5: 输入标题...');
+  logger.info('[publishNote] Step 5: 输入标题...');
   await page.waitForSelector(SELECTORS.TITLE_INPUT);
   await page.click(SELECTORS.TITLE_INPUT);
-  await delay(300 + Math.random() * 200);
-  
-  // 逐字符输入，模拟真人打字
-  for (const char of draft.title) {
-    await page.keyboard.type(char);
-    await delay(80 + Math.random() * 120);  // 80-200ms 变速
-  }
-  await delay(1000 + Math.random() * 500);
+  await randomDelay(260, 520);
+  await humanType(page, SELECTORS.TITLE_INPUT, draft.title);
+  await randomDelay(800, 1400);
 
   // Step 6: 输入正文 (使用逐行输入模式，解决空行问题)
-  console.log('[publishNote] Step 6: 输入正文...');
+  logger.info('[publishNote] Step 6: 输入正文...');
   const contentEditor = await getContentEditor(page);
   await contentEditor.click();
   // 使用逐行输入，确保换行正确显示
   await typeContentLineByLine(page, contentEditor, draft.content);
 
   // Step 7: 输入标签 (publish.go:252)
-  console.log('[publishNote] Step 7: 输入标签...');
+  logger.info('[publishNote] Step 7: 输入标签...');
   await inputTags(page, contentEditor, draft.tags);
-  await delay(1000);  // publish.go:258
+  await randomDelay(800, 1300);
 
   // Step 8: 点击发布按钮 (publish.go:260-261)
-  console.log('[publishNote] Step 8: 点击发布按钮...');
+  logger.info('[publishNote] Step 8: 点击发布按钮...');
   await page.click(SELECTORS.SUBMIT_BUTTON);
-  await delay(3000);  // publish.go:263 - 等待发布完成
+  await randomDelay(2600, 3600);
 
-  console.log('========================================');
-  console.log(`[publishNote] 发布完成: "${draft.title}"`);
-  console.log('========================================');
+  logger.info('========================================');
+  logger.info(`[publishNote] 发布完成: "${draft.title}"`);
+  logger.info('========================================');
 }
 
 // === Markdown 解析 ===
@@ -469,7 +464,7 @@ export async function publishNote(page: Page, draft: Draft): Promise<void> {
 
 /** 解析 Markdown 文件为 Draft 对象 */
 export function parseMarkdown(mdFilePath: string): Draft {
-  console.log(`[parseMarkdown] 解析文件: ${mdFilePath}`);
+  logger.info(`[parseMarkdown] 解析文件: ${mdFilePath}`);
 
   const content = fs.readFileSync(mdFilePath, 'utf-8');
   const lines = content.split('\n');
@@ -538,32 +533,13 @@ export function parseMarkdown(mdFilePath: string): Draft {
     imagePaths: imagePaths,
   };
 
-  console.log(`[parseMarkdown] 解析结果:`);
-  console.log(`  - 标题: ${draft.title}`);
-  console.log(`  - 标签: ${draft.tags.join(', ')}`);
-  console.log(`  - 图片: ${draft.imagePaths.length} 张`);
-  console.log(`  - 正文长度: ${draft.content.length} 字符`);
+  logger.info(`[parseMarkdown] 解析结果:`);
+  logger.info(`  - 标题: ${draft.title}`);
+  logger.info(`  - 标签: ${draft.tags.join(', ')}`);
+  logger.info(`  - 图片: ${draft.imagePaths.length} 张`);
+  logger.info(`  - 正文长度: ${draft.content.length} 字符`);
 
   return draft;
-}
-
-/** 扫描 drafts 目录 */
-function findFirstDraft(): string | null {
-  // 确保目录存在
-  if (!fs.existsSync(DRAFTS_DIR)) {
-    fs.mkdirSync(DRAFTS_DIR, { recursive: true });
-    console.log(`[findFirstDraft] 创建目录: ${DRAFTS_DIR}`);
-    return null;
-  }
-
-  const files = fs.readdirSync(DRAFTS_DIR);
-  for (const file of files) {
-    if (file.endsWith('.md')) {
-      return path.join(DRAFTS_DIR, file);
-    }
-  }
-
-  return null;
 }
 
 /** 归档已发布的文件 */
@@ -579,7 +555,7 @@ function archivePublishedFiles(draft: Draft, mdFilePath: string): void {
   // 移动 .md 文件
   const newMdPath = path.join(PUBLISHED_DIR, `${baseName}_${timestamp}.md`);
   fs.renameSync(mdFilePath, newMdPath);
-  console.log(`[archive] 已归档: ${mdFilePath} -> ${newMdPath}`);
+  logger.info(`[archive] 已归档: ${mdFilePath} -> ${newMdPath}`);
 
   // 移动图片文件
   for (const imagePath of draft.imagePaths) {
@@ -587,51 +563,35 @@ function archivePublishedFiles(draft: Draft, mdFilePath: string): void {
       const imageExt = path.extname(imagePath);
       const newImagePath = path.join(PUBLISHED_DIR, `${baseName}_${timestamp}${imageExt}`);
       fs.renameSync(imagePath, newImagePath);
-      console.log(`[archive] 已归档: ${imagePath} -> ${newImagePath}`);
+      logger.info(`[archive] 已归档: ${imagePath} -> ${newImagePath}`);
     }
   }
-}
-
-/** 加载 Cookies */
-async function loadCookies(page: Page): Promise<void> {
-  if (!fs.existsSync(COOKIES_PATH)) {
-    console.warn(`[loadCookies] Cookie 文件不存在: ${COOKIES_PATH}`);
-    console.warn('[loadCookies] 请先运行登录流程获取 Cookie');
-    return;
-  }
-
-  const cookiesData = fs.readFileSync(COOKIES_PATH, 'utf-8');
-  const cookies = JSON.parse(cookiesData);
-
-  // Puppeteer 需要的 cookie 格式
-  await page.setCookie(...cookies);
-  console.log(`[loadCookies] 已加载 ${cookies.length} 个 Cookie`);
 }
 
 // === 程序入口 ===
 
 async function main(): Promise<void> {
-  console.log('╔════════════════════════════════════════╗');
-  console.log('║   XHS Publisher - 小红书自动发布系统   ║');
-  console.log('║   Based on xiaohongshu-mcp (Go)        ║');
-  console.log('╚════════════════════════════════════════╝');
-  console.log();
+  logger.info('╔════════════════════════════════════════╗');
+  logger.info('║   XHS Publisher - 小红书自动发布系统   ║');
+  logger.info('║   Based on xiaohongshu-mcp (Go)        ║');
+  logger.info('╚════════════════════════════════════════╝');
+  logger.info('');
 
   let browser: Browser | null = null;
 
   try {
     // Step 1: 查找待发布文件
-    console.log('[main] Step 1: 扫描 drafts 目录...');
+    logger.info('[main] Step 1: 扫描 drafts 目录...');
     const mdFilePath = findFirstDraft();
     if (!mdFilePath) {
-      console.log(`[main] 没有找到待发布的 .md 文件`);
-      console.log(`[main] 请将 Markdown 文件放入: ${DRAFTS_DIR}`);
+      logger.warn(`[main] 没有找到待发布的 .md 文件`);
+      logger.warn(`[main] 请将 Markdown 文件放入: ${DRAFTS_DIR}`);
       return;
     }
-    console.log(`[main] 找到待发布文件: ${mdFilePath}`);
+    logger.info(`[main] 找到待发布文件: ${mdFilePath}`);
 
     // Step 2: 解析 Markdown
-    console.log('[main] Step 2: 解析 Markdown 文件...');
+    logger.info('[main] Step 2: 解析 Markdown 文件...');
     const draft = parseMarkdown(mdFilePath);
 
     // 验证图片
@@ -640,15 +600,10 @@ async function main(): Promise<void> {
     }
 
     // Step 3: 启动浏览器 (v4.1 安全加固)
-    console.log('[main] Step 3: 启动浏览器...');
-    
-    // 随机视口尺寸
-    const viewportWidth = 1280 + Math.floor(Math.random() * 100) - 50;
-    const viewportHeight = 800 + Math.floor(Math.random() * 100) - 50;
+    logger.info('[main] Step 3: 启动浏览器...');
     
     browser = await puppeteerExtra.launch({
       headless: false,
-      defaultViewport: { width: viewportWidth, height: viewportHeight },
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -659,41 +614,35 @@ async function main(): Promise<void> {
     });
 
     const page = await browser.newPage();
-    
-    // 隐藏 webdriver 特征
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-      (window as any).chrome = { runtime: {} };
-    });
-    
-    // 设置 User-Agent
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
+    await applyStealthProfile(page);
 
     // Step 4: 加载 Cookie
-    console.log('[main] Step 4: 加载 Cookie...');
-    await loadCookies(page);
+    logger.info('[main] Step 4: 加载 Cookie...');
+    const cookiesOk = await loadCookies(page);
+    if (!cookiesOk) {
+      logger.error('[main] Cookie 加载失败，请先运行 login.ts');
+      return;
+    }
 
     // Step 5: 执行发布
-    console.log('[main] Step 5: 开始发布流程...');
+    logger.info('[main] Step 5: 开始发布流程...');
     await publishNote(page, draft);
 
     // Step 6: 归档文件
-    console.log('[main] Step 6: 归档已发布文件...');
+    logger.info('[main] Step 6: 归档已发布文件...');
     archivePublishedFiles(draft, mdFilePath);
 
-    console.log();
-    console.log('╔════════════════════════════════════════╗');
-    console.log('║         ✅ 发布成功！                  ║');
-    console.log('╚════════════════════════════════════════╝');
+    logger.info('');
+    logger.info('╔════════════════════════════════════════╗');
+    logger.info('║         ✅ 发布成功！                  ║');
+    logger.info('╚════════════════════════════════════════╝');
 
   } catch (error) {
-    console.error();
-    console.error('╔════════════════════════════════════════╗');
-    console.error('║         ❌ 发布失败！                  ║');
-    console.error('╚════════════════════════════════════════╝');
-    console.error('错误信息:', error);
+    logger.error('');
+    logger.error('╔════════════════════════════════════════╗');
+    logger.error('║         ❌ 发布失败！                  ║');
+    logger.error('╚════════════════════════════════════════╝');
+    logger.error('错误信息:', error);
 
     // 截图保存
     if (browser) {
@@ -702,10 +651,10 @@ async function main(): Promise<void> {
         if (pages.length > 0) {
           const screenshotPath = path.join(PROJECT_ROOT, 'error_screenshot.png');
           await pages[0].screenshot({ path: screenshotPath, fullPage: true });
-          console.error(`[main] 错误截图已保存: ${screenshotPath}`);
+          logger.error(`[main] 错误截图已保存: ${screenshotPath}`);
         }
       } catch (screenshotError) {
-        console.error('[main] 截图保存失败:', screenshotError);
+        logger.error('[main] 截图保存失败:', screenshotError);
       }
     }
 
@@ -714,12 +663,12 @@ async function main(): Promise<void> {
   } finally {
     // 等待用户查看结果
     if (browser) {
-      console.log();
-      console.log('[main] 浏览器将在 10 秒后关闭...');
-      await delay(10000);
+      logger.info('');
+      logger.info('[main] 浏览器将在 10 秒后关闭...');
+      await randomDelay(9000, 12000);
       await browser.close();
     }
   }
 }
 
-main().catch(console.error);
+main().catch(err => logger.error('[main] 异常', err));

@@ -9,9 +9,11 @@ import * as fs from 'fs';
 
 // 从模块导入
 import { COOKIES_PATH } from './src/config';
-import { delay } from './src/utils';
+import { delay, applyStealthProfile } from './src/utils';
+import { Logger } from './src/logger';
 
 puppeteerExtra.use(StealthPlugin());
+const logger = new Logger('Login');
 
 // 登录专用配置
 const MAIN_SITE_URL = 'https://www.xiaohongshu.com';
@@ -160,12 +162,12 @@ function formatRemainingTime(ms: number): string {
  * 主函数
  */
 async function main(): Promise<void> {
-  console.log('╔════════════════════════════════════════╗');
-  console.log('║   XHS Login - 小红书登录工具           ║');
-  console.log('╚════════════════════════════════════════╝');
-  console.log();
+  logger.info('╔════════════════════════════════════════╗');
+  logger.info('║   XHS Login - 小红书登录工具           ║');
+  logger.info('╚════════════════════════════════════════╝');
+  logger.info('');
 
-  console.log('[login] Step 1: 启动浏览器...');
+  logger.info('[login] Step 1: 启动浏览器...');
   const browser = await puppeteerExtra.launch({
     headless: false,          // 显示浏览器
     defaultViewport: null,    // 最大化窗口
@@ -179,23 +181,19 @@ async function main(): Promise<void> {
 
   try {
     const page = await browser.newPage();
+    await applyStealthProfile(page);
 
-    // 设置更真实的 User-Agent
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
-
-    console.log('[login] Step 2: 导航到小红书主站...');
+    logger.info('[login] Step 2: 导航到小红书主站...');
     await page.goto(MAIN_SITE_URL, { waitUntil: 'networkidle2' });
     await delay(2000);
 
     // 检查是否已经登录 (可能有旧 Cookie)
     const alreadyLoggedIn = await isLoggedIn(page);
     if (alreadyLoggedIn) {
-      console.log('[login] 检测到已登录状态，直接保存 Cookie...');
+      logger.info('[login] 检测到已登录状态，直接保存 Cookie...');
     } else {
       // 尝试触发登录弹窗 - 点击登录按钮
-      console.log('[login] 尝试触发登录弹窗...');
+      logger.info('[login] 尝试触发登录弹窗...');
       try {
         const loginBtn = await page.$('.login-btn, [class*="login"], button:has-text("Login")');
         if (loginBtn) {
@@ -207,20 +205,20 @@ async function main(): Promise<void> {
       }
     }
 
-    console.log();
-    console.log('╔════════════════════════════════════════╗');
-    console.log('║  📱 请使用小红书 APP 扫描二维码登录    ║');
-    console.log('║                                        ║');
-    console.log('║  🌐 登录站点: www.xiaohongshu.com      ║');
-    console.log('║  ⏰ 超时时间: 3 分钟                   ║');
-    console.log('║  🔑 Cookie 全站通用 (主站+创作中心)   ║');
-    console.log('╚════════════════════════════════════════╝');
-    console.log();
+    logger.info('');
+    logger.info('╔════════════════════════════════════════╗');
+    logger.info('║  📱 请使用小红书 APP 扫描二维码登录    ║');
+    logger.info('║                                        ║');
+    logger.info('║  🌐 登录站点: www.xiaohongshu.com      ║');
+    logger.info('║  ⏰ 超时时间: 3 分钟                   ║');
+    logger.info('║  🔑 Cookie 全站通用 (主站+创作中心)   ║');
+    logger.info('╚════════════════════════════════════════╝');
+    logger.info('');
 
     // Step 3: 等待登录成功 (带倒计时)
-    console.log('[login] Step 3: 等待扫码登录...');
-    console.log('[login] 提示: 如果没看到二维码，请点击页面右上角的"登录"按钮');
-    console.log();
+    logger.info('[login] Step 3: 等待扫码登录...');
+    logger.info('[login] 提示: 如果没看到二维码，请点击页面右上角的\"登录\"按钮');
+    logger.info('');
     
     const startTime = Date.now();
     let loggedIn = false;
@@ -248,58 +246,58 @@ async function main(): Promise<void> {
       await delay(1000);
     }
 
-    console.log();  // 换行
-    console.log();
+    logger.info('');
 
     if (!loggedIn) {
       throw new Error('登录超时 (3分钟)，请重新运行脚本');
     }
 
     // Step 4: 等待页面完全加载 + 获取用户信息
-    console.log('[login] Step 4: 登录成功！正在获取用户信息...');
+    logger.info('[login] Step 4: 登录成功！正在获取用户信息...');
     await delay(3000);
 
     // 尝试获取昵称
     const nickname = await getNickname(page);
 
     // Step 5: 保存 Cookie
-    console.log('[login] Step 5: 保存 Cookie...');
+    logger.info('[login] Step 5: 保存 Cookie...');
     const cookies = await page.cookies();
     
     // 写入文件
     fs.writeFileSync(COOKIES_PATH, JSON.stringify(cookies, null, 2), 'utf-8');
 
-    console.log();
-    console.log('╔════════════════════════════════════════╗');
-    console.log('║   ✅ 登录成功，Cookie 已保存！         ║');
-    console.log('╚════════════════════════════════════════╝');
-    console.log();
+    logger.info('');
+    logger.info('╔════════════════════════════════════════╗');
+    logger.info('║   ✅ 登录成功，Cookie 已保存！         ║');
+    logger.info('╚════════════════════════════════════════╝');
+    logger.info('');
     
     // 显示登录身份确认
     if (nickname) {
-      console.log(`  👤 当前账号: ${nickname}`);
+      logger.info(`  👤 当前账号: ${nickname}`);
     } else {
-      console.log('  👤 当前账号: (无法获取昵称，但登录已成功)');
+      logger.info('  👤 当前账号: (无法获取昵称，但登录已成功)');
     }
-    console.log();
-    console.log(`  📁 Cookie 文件: ${COOKIES_PATH}`);
-    console.log(`  🔢 Cookie 数量: ${cookies.length} 个`);
+    logger.info('');
+    logger.info(`  📁 Cookie 文件: ${COOKIES_PATH}`);
+    logger.info(`  🔢 Cookie 数量: ${cookies.length} 个`);
     
     // 检查 Cookie 域名
     const domains = [...new Set(cookies.map((c: any) => c.domain))];
-    console.log(`  🌐 Cookie 域名: ${domains.join(', ')}`);
-    console.log();
-    console.log('  ✅ 这组 Cookie 可用于:');
-    console.log('     - www.xiaohongshu.com (主站浏览)');
-    console.log('     - creator.xiaohongshu.com (创作中心)');
-    console.log();
-    console.log('  💡 现在可以运行:');
-    console.log('     npx tsx index.ts      # 情报搜集');
-    console.log('     npx tsx publisher.ts  # 发布笔记');
+    logger.info(`  🌐 Cookie 域名: ${domains.join(', ')}`);
+    
+    logger.info('');
+    logger.info('  ✅ 这组 Cookie 可用于:');
+    logger.info('     - www.xiaohongshu.com (主站浏览)');
+    logger.info('     - creator.xiaohongshu.com (创作中心)');
+    logger.info('');
+    logger.info('  💡 现在可以运行:');
+    logger.info('     npx tsx index.ts      # 情报搜集');
+    logger.info('     npx tsx publisher.ts  # 发布笔记');
 
   } finally {
-    console.log();
-    console.log('[login] 浏览器将在 3 秒后关闭...');
+    logger.info('');
+    logger.info('[login] 浏览器将在 3 秒后关闭...');
     await delay(3000);
     await browser.close();
   }
@@ -307,10 +305,10 @@ async function main(): Promise<void> {
 
 // 运行
 main().catch((error) => {
-  console.error();
-  console.error('╔════════════════════════════════════════╗');
-  console.error('║   ❌ 登录失败！                        ║');
-  console.error('╚════════════════════════════════════════╝');
-  console.error('错误信息:', error.message);
+  logger.error('');
+  logger.error('╔════════════════════════════════════════╗');
+  logger.error('║   ❌ 登录失败！                        ║');
+  logger.error('╚════════════════════════════════════════╝');
+  logger.error('错误信息:', error.message);
   process.exit(1);
 });
