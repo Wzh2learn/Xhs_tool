@@ -33,7 +33,8 @@ function setRunStatus(running, script) {
 
 function appendLine({ line, source }) {
   const div = document.createElement('div');
-  div.className = `line ${source}`;
+  const isError = /(error|Error|❌|⚠️)/.test(line);
+  div.className = `line ${source}${isError ? ' log-error' : ''}`;
   div.textContent = line;
   terminalEl.appendChild(div);
   if (autoScroll) {

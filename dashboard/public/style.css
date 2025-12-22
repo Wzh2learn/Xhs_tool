@@ -176,6 +176,7 @@ body {
 .line.stdout { color: var(--text); }
 .line.stderr { color: var(--danger); }
 .line.system { color: var(--muted); }
+.log-error { color: #ff5555; font-weight: bold; }
 
 .tabs {
   display: grid;

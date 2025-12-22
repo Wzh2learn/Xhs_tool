@@ -3,6 +3,7 @@
  */
 import { Page } from 'puppeteer';
 import * as fs from 'fs';
+import * as path from 'path';
 import { SAFETY_CONFIG, COOKIES_PATH } from './config';
 import { logger } from './logger';
 import UserAgent from 'user-agents';
@@ -16,6 +17,37 @@ export function delay(ms: number): Promise<void> {
 export function randomDelay(min: number, max: number): Promise<void> {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return delay(ms);
+}
+
+// === 原子写入 ===
+
+export function atomicWriteJsonSync(targetPath: string, data: unknown): void {
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const tmpPath = path.join(dir, `.${path.basename(targetPath)}.${process.pid}.${Date.now()}.tmp`);
+  const json = JSON.stringify(data, null, 2);
+
+  const fd = fs.openSync(tmpPath, 'w');
+  try {
+    fs.writeFileSync(fd, json, 'utf-8');
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  if (fs.existsSync(targetPath)) {
+    const bakPath = `${targetPath}.bak`;
+    try {
+      fs.copyFileSync(targetPath, bakPath);
+    } catch {
+      // 备份失败不阻断主流程
+    }
+  }
+
+  fs.renameSync(tmpPath, targetPath);
 }
 
 // === Stealth / 指纹伪装 ===

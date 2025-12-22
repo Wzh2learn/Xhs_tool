@@ -2,6 +2,7 @@
  * XHS Login Utility - 小红书主站登录与 Cookie 保存
  * @see README.md
  */
+import 'dotenv/config';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page, Browser } from 'puppeteer';
@@ -9,7 +10,7 @@ import * as fs from 'fs';
 
 // 从模块导入
 import { COOKIES_PATH } from './src/config';
-import { delay, applyStealthProfile } from './src/utils';
+import { delay, applyStealthProfile, atomicWriteJsonSync } from './src/utils';
 import { Logger } from './src/logger';
 
 puppeteerExtra.use(StealthPlugin());
@@ -264,7 +265,7 @@ async function main(): Promise<void> {
     const cookies = await page.cookies();
     
     // 写入文件
-    fs.writeFileSync(COOKIES_PATH, JSON.stringify(cookies, null, 2), 'utf-8');
+    atomicWriteJsonSync(COOKIES_PATH, cookies);
 
     logger.info('');
     logger.info('╔════════════════════════════════════════╗');

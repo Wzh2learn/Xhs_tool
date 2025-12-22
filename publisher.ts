@@ -2,6 +2,7 @@
  * XHS Publisher - 发布系统
  * @see README.md
  */
+import 'dotenv/config';
 import puppeteer, { Page, ElementHandle, Browser } from 'puppeteer';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
