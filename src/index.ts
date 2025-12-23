@@ -29,3 +29,6 @@ export * from './logger';
 // Agents
 export * from './agents/searchAgent';
 export * from './agents/feedAgent';
+
+// XHS __INITIAL_STATE__ helpers
+export * from './xhsInitialState';

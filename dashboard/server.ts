@@ -40,7 +40,24 @@ app.get('/api/database', async (_req, res) => {
   }
 });
 
-type ScriptName = 'login' | 'scout' | 'publish';
+// 工具式接口：通过 tool.ts 调用 list/search/detail/profile
+// GET /api/tool?action=searchFeeds&params={"keyword":"推荐系统"}
+app.get('/api/tool', (req, res) => {
+  const action = (req.query.action as string) || '';
+  const params = (req.query.params as string) || '';
+  if (!action) {
+    return res.status(400).json({ error: 'action is required', actions: ['listFeeds', 'searchFeeds', 'getFeedDetail', 'userProfile'] });
+  }
+  if (currentProc) {
+    return res.status(429).json({ error: `任务正在运行: ${currentScript}` });
+  }
+
+  emitLog(`[system] API 调用 tool: ${action} ${params ? `(params: ${params})` : ''}`, 'system');
+  startScript('tool', params ? [action, params] : [action]);
+  res.json({ ok: true, action, params });
+});
+
+type ScriptName = 'login' | 'scout' | 'publish' | 'tool';
 
 let currentProc: ChildProcessWithoutNullStreams | null = null;
 let currentScript: ScriptName | null = null;
@@ -49,6 +66,7 @@ const scriptMap: Record<ScriptName, { cmd: string; args: string[] }> = {
   login: { cmd: 'npx', args: ['tsx', 'login.ts'] },
   scout: { cmd: 'npx', args: ['tsx', 'index.ts'] },
   publish: { cmd: 'npx', args: ['tsx', 'publisher.ts'] },
+  tool: { cmd: 'npx', args: ['tsx', 'tool.ts'] }, // 新增工具入口
 };
 
 function broadcastStatus() {
@@ -62,16 +80,17 @@ function emitLog(message: string, source: 'stdout' | 'stderr' | 'system', script
   }
 }
 
-function startScript(script: ScriptName) {
+function startScript(script: ScriptName, extraArgs: string[] = []) {
   if (currentProc) {
     emitLog(`[system] 任务正在运行: ${currentScript}. 请稍后再试`, 'system');
     return;
   }
 
   const spec = scriptMap[script];
+  const args = extraArgs.length > 0 ? [...spec.args, ...extraArgs] : spec.args;
   emitLog(`[system] 启动脚本: ${script}`, 'system');
 
-  const child = spawn(spec.cmd, spec.args, {
+  const child = spawn(spec.cmd, args, {
     cwd: PROJECT_ROOT,
     shell: process.platform === 'win32',
     env: process.env,

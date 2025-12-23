@@ -1,0 +1,51 @@
+﻿# xhs_automation - Project Rules (Architect Mode, deep dive)
+
+## 0) Rule Priority
+- Project docs outrank generic rules: [README.md](cci:7://file:///d:/AIlearn/xhs_automation/README.md:0:0-0:0), [ARCHITECTURE.md](cci:7://file:///d:/AIlearn/xhs_automation/ARCHITECTURE.md:0:0-0:0), [SOP.md](cci:7://file:///d:/AIlearn/xhs_automation/SOP.md:0:0-0:0), this [.windsurfrules](cci:7://file:///d:/AIlearn/AlgoQuest3/.windsurfrules:0:0-0:0).
+- If a stage/module has its own instructions, follow them first (dashboard, scout/index.ts, publisher.ts, login.ts, src/*).
+
+## 1) Context-First Workflow
+- Before edits, read the nearest doc in scope (README/SOP/ARCHITECTURE + touched file). Do not scan all files; focus on the entry script plus the relevant `src/*` module.
+- Quick map: [dashboard/server.ts](cci:7://file:///d:/AIlearn/xhs_automation/dashboard/server.ts:0:0-0:0) (process lock, kill switch), [index.ts](cci:7://file:///d:/AIlearn/xhs_automation/index.ts:0:0-0:0) (scout), `publisher.ts`, `login.ts`; library in `src/` (config, types, selectors, utils, ai, ocr, database, logger).
+
+## 2) Stack & Execution
+- Node.js + TypeScript (tsx) + Puppeteer (+ puppeteer-extra + stealth). Socket.io dashboard, marked for report rendering.
+- Dashboard-first: `npm run dashboard` → control Login/Scout/Publish, single-process lock + kill button @d:\AIlearn\xhs_automation\dashboard\server.ts#43-120.
+- CLI fallbacks: `npx tsx login.ts`, `npx tsx index.ts`, `npx tsx publisher.ts`.
+- Data paths auto-created from `src/config.ts` (PROJECT_ROOT, cookies, reports, data, drafts/published).
+
+## 3) Safety Constraints (Account Ban Risk)
+- Never reduce or bypass `SAFETY_CONFIG` delays/intervals @d:\AIlearn\xhs_automation\src\config.ts#44-75.
+- Never run scout/publish in parallel; respect dashboard process lock/kill switch.
+- Preserve anti-detection: stealth profile, human-like actions (bezier mouse, variable typing, scroll/read timing) @d:\AIlearn\xhs_automation\src\utils.ts#127-208.
+- Respect session limits (keywords per session, notes per keyword) and avoid frequent logins; keep cookies in `xhs_cookies.json` (gitignored).
+
+## 4) Module-Specific Guards
+- `config.ts`: keep SAFETY_CONFIG defaults, path creation, AI_CONFIG optional (DeepSeek). Do not hardcode keys.
+- `selectors.ts`: update selectors minimally; when changed, add manual verify step referencing `error_screenshot.png`.
+- `utils.ts`: keep humanClick/humanType/humanScroll randomness; keep loadCookies checks; preserve URL/id helpers.
+- `ai.ts`: AI optional; retries + timeout; skip gracefully if no key (README guarantee).
+- `ocr.ts`: 10s timeout, max 3 images; keep language config; ensure delay/human view preserved.
+- `database.ts`: JSON incremental save with dedup by noteId; keep status fields.
+- [index.ts](cci:7://file:///d:/AIlearn/xhs_automation/index.ts:0:0-0:0) (Scout): keep keyword expansion (AI optional), feed browsing insertion, login detection, AI report generation.
+- `publisher.ts`: preserve popover removal, dual-editor detection, upload wait, image count checks; same-name image + md rule.
+- `login.ts`: keep stealth profile, login success/failure indicators, atomic cookie write.
+- [dashboard/server.ts](cci:7://file:///d:/AIlearn/xhs_automation/dashboard/server.ts:0:0-0:0): preserve single-task lock + kill switch; do not spawn concurrent scripts.
+
+## 5) Validation Loop (every change)
+- Minimum: `npm run dashboard` (server boots) and `npx tsx test_all.ts`.
+- Targeted: `npx tsx index.ts` for scout changes; `npx tsx publisher.ts` for publish flow; `npx tsx login.ts` for login changes.
+- Selector changes: provide a quick manual check and point to `error_screenshot.png`.
+
+## 6) Coding Style & Modularity
+- Keep entry scripts thin; put shared logic in `src/`. Avoid `any`; types in `src/types.ts` are authoritative.
+- Log with `Logger`; no silent catches. Maintain retries/timeouts and random delays.
+- No hardcoded secrets; use `.env` / env vars. Keep PROJECT_ROOT-relative paths.
+
+## 7) Windows / PowerShell
+- Use PowerShell 7+ syntax; no bash-only instructions. Avoid `cd`; set `cwd` when giving commands.
+- Use existing kill logic instead of ad-hoc `taskkill` unless explicitly modifying process mgmt.
+
+## 8) Interaction
+- If runtime errors occur, prefer inspecting logs/screenshots (`error_screenshot.png`) before asking.
+- Keep responses concise; cite code with anchors when needed.

@@ -12,6 +12,10 @@ import {
   recognizeImage,
   Logger,
   NoteInfo,
+  extractSearchFeeds,
+  extractFeedDetail,
+  XhsFeed,
+  XhsFeedDetailResponse,
 } from '..';
 
 type AgentLogger = Logger | { info: Function; warn: Function; error: Function; debug?: Function };
@@ -37,6 +41,205 @@ export async function searchNotes(page: Page, keyword: string, opts: AgentContex
   await humanScroll(page);
   await page.mouse.move(300 + Math.random() * 600, 200 + Math.random() * 400);
 
+  // 尝试使用 __INITIAL_STATE__（更稳定、更快）
+  try {
+    const feedsFromState = await extractSearchFeeds(page);
+    if (feedsFromState && feedsFromState.length > 0) {
+      logger.info(`✅ 使用 __INITIAL_STATE__ 抽取搜索结果 (${feedsFromState.length} 条)`);
+      const limited = feedsFromState.slice(0, SAFETY_CONFIG.MAX_NOTES_PER_KEYWORD || 3);
+      const notes: NoteInfo[] = [];
+
+      for (let i = 0; i < limited.length; i++) {
+        const feed = limited[i];
+        const note = await collectByDetail(page, feed, { logger });
+        if (note) notes.push(note);
+        await randomDelay(SAFETY_CONFIG.DETAIL_READ_MIN, SAFETY_CONFIG.DETAIL_READ_MAX);
+      }
+
+      if (notes.length > 0) return notes;
+      logger.warn('⚠️ __INITIAL_STATE__ 解析未得到有效详情，回退 DOM 方案');
+    }
+  } catch (err: any) {
+    logger.warn(`⚠️ __INITIAL_STATE__ 解析失败，回退 DOM 方案: ${err?.message || err}`);
+  }
+
+  // 回退：保留原有 DOM 点击 + 弹窗采集流程
+  return await collectByDom(page, keyword, logger);
+}
+
+function buildDetailUrl(feedId: string, xsecToken?: string) {
+  if (!feedId) return '';
+  if (xsecToken) return `https://www.xiaohongshu.com/explore/${feedId}?xsec_token=${xsecToken}&xsec_source=pc_feed`;
+  return `https://www.xiaohongshu.com/explore/${feedId}`;
+}
+
+async function collectByDetail(page: Page, feed: XhsFeed, ctx: { logger: AgentLogger; keyword?: string }): Promise<NoteInfo | null> {
+  const { logger, keyword = '' } = ctx;
+  const feedId = feed.id;
+  const xsecToken = feed.xsecToken;
+  if (!feedId) return null;
+
+  const titleHint = feed.noteCard?.displayTitle || `笔记${feedId.slice(-4)}`;
+  const detailUrl = buildDetailUrl(feedId, xsecToken);
+
+  try {
+    logger.info(`👆 进入详情（state）：${titleHint.substring(0, 30)}...`);
+    await page.goto(detailUrl, { waitUntil: 'networkidle2' });
+    await randomDelay(SAFETY_CONFIG.PAGE_LOAD_WAIT_MIN, SAFETY_CONFIG.PAGE_LOAD_WAIT_MAX);
+
+    const detail = await extractFeedDetail(page, feedId);
+    if (!detail) {
+      logger.warn('⚠️ state 详情为空，尝试 DOM fallback');
+      return await collectFromDomDetail(page, feedId, { logger, keyword, titleHint, xsecToken });
+    }
+
+    const note = mapDetailToNote(detail, feed, keyword);
+    if (note) return note;
+
+    logger.warn('⚠️ state 详情映射失败，尝试 DOM fallback');
+    return await collectFromDomDetail(page, feedId, { logger, keyword, titleHint, xsecToken });
+  } catch (err: any) {
+    logger.warn(`⚠️ 详情采集异常，回退 DOM: ${err?.message || err}`);
+    return await collectFromDomDetail(page, feedId, { logger, keyword, titleHint, xsecToken });
+  }
+}
+
+function mapDetailToNote(detail: XhsFeedDetailResponse, feed: XhsFeed, keyword: string): NoteInfo | null {
+  const base = detail.note;
+  if (!base?.noteId) return null;
+
+  const title = base.title || feed.noteCard?.displayTitle || `笔记${base.noteId.slice(-4)}`;
+  const fullContent = base.desc && base.desc.trim().length > 0 ? base.desc.trim() : `[图片笔记] ${title}`;
+  const user = base.user || feed.noteCard?.user;
+
+  const comments =
+    (detail.comments?.list || [])
+      .slice(0, 3)
+      .map((c) => ({
+        author: c.userInfo?.nickName || c.userInfo?.nickname || c.userInfo?.redId || '未知',
+        content: (c.content || '').substring(0, 200),
+        likes: c.likeCount || '0',
+      })) || [];
+
+  return {
+    keyword: keyword || '[Search]',
+    title,
+    author: user?.nickName || user?.nickname || user?.redId || '未知作者',
+    authorLink: user?.redId ? `https://www.xiaohongshu.com/user/profile/${user.redId}` : '',
+    authorId: user?.userId,
+    authorRedId: user?.redId,
+    likes: base.interactInfo?.likedCount || feed.noteCard?.interactInfo?.likedCount || '0',
+    link: `https://www.xiaohongshu.com/explore/${base.noteId}`,
+    noteId: base.noteId,
+    xsecToken: base.xsecToken || feed.xsecToken,
+    content: fullContent.substring(0, CONTENT_SUMMARY_LENGTH),
+    fullContent,
+    tags: [], // __INITIAL_STATE__ 中暂无标签，保持空
+    comments,
+  };
+}
+
+async function collectFromDomDetail(
+  page: Page,
+  feedId: string,
+  ctx: { logger: AgentLogger; keyword: string; titleHint: string; xsecToken?: string },
+): Promise<NoteInfo | null> {
+  const { logger, keyword, titleHint, xsecToken } = ctx;
+
+  const detailUrl = buildDetailUrl(feedId, xsecToken);
+  await page.goto(detailUrl, { waitUntil: 'networkidle2' });
+  await randomDelay(1500, 2500);
+
+  // 复用原 DOM 详情提取逻辑（弹窗版本改为整页选择器）
+  const containerSelector = '.note-detail-mask, [class*="note-detail"], [class*="noteDetail"], .interaction-container';
+  try {
+    await page.waitForSelector(containerSelector, { timeout: 8000, visible: true });
+  } catch {
+    logger.warn('⚠️ DOM 详情未出现，跳过');
+    return null;
+  }
+
+  const content = await page
+    .evaluate((sel) => {
+      const container = document.querySelector(sel);
+      if (!container) return '';
+      const descSelectors = ['#detail-desc', '.desc', '[class*="desc"]', '.note-text', '[class*="content"]'];
+      for (const s of descSelectors) {
+        const el = container.querySelector(s);
+        if (el) {
+          const t = el.textContent?.trim() || '';
+          if (t.length > 20 && !t.includes('沪ICP备')) return t.substring(0, 2000);
+        }
+      }
+      return '';
+    }, containerSelector)
+    .catch(() => '');
+
+  const author = await page
+    .evaluate((sel) => {
+      const container = document.querySelector(sel);
+      const el = container?.querySelector('.author-wrapper .name, .user-name, .nickname, [class*="author"] [class*="name"]');
+      return el?.textContent?.trim() || '未知作者';
+    }, containerSelector)
+    .catch(() => '未知作者');
+
+  const likes = await page
+    .evaluate((sel) => {
+      const container = document.querySelector(sel);
+      const el = container?.querySelector('.like-wrapper .count, [class*="like"] .count, [class*="like-count"]');
+      return el?.textContent?.trim() || '0';
+    }, containerSelector)
+    .catch(() => '0');
+
+  const tags = await page
+    .evaluate((sel) => {
+      const container = document.querySelector(sel);
+      const els = container?.querySelectorAll('a.tag, .hash-tag, a[href*="/search_result"]') || [];
+      return Array.from(els)
+        .map((el) => el.textContent?.trim() || '')
+        .filter((t) => t.startsWith('#'))
+        .slice(0, 5);
+    }, containerSelector)
+    .catch(() => []);
+
+  const comments = await page
+    .evaluate((sel) => {
+      const container = document.querySelector(sel);
+      if (!container) return [];
+      const items = container.querySelectorAll('.comment-item, [class*="comment-item"]');
+      const result: { author: string; content: string; likes: string }[] = [];
+      items.forEach((item, idx) => {
+        if (idx >= 3) return;
+        const author = item.querySelector('.name, .nickname, [class*="name"]')?.textContent?.trim() || '';
+        const content = item.querySelector('.content, .note-text, [class*="content"]')?.textContent?.trim() || '';
+        const likes = item.querySelector('.like .count, [class*="like"] .count')?.textContent?.trim() || '0';
+        if (author && content) {
+          result.push({ author, content: content.substring(0, 100), likes });
+        }
+      });
+      return result;
+    }, containerSelector)
+    .catch(() => []);
+
+  const fullContent = content || `[图片笔记] ${titleHint}`;
+
+  return {
+    keyword: keyword || '[Search]',
+    title: titleHint,
+    author,
+    authorLink: '',
+    likes,
+    link: `https://www.xiaohongshu.com/explore/${feedId}`,
+    noteId: feedId,
+    xsecToken,
+    content: fullContent.substring(0, CONTENT_SUMMARY_LENGTH),
+    fullContent,
+    tags,
+    comments,
+  };
+}
+
+async function collectByDom(page: Page, keyword: string, logger: AgentLogger): Promise<NoteInfo[]> {
   const cardSelectors = [
     'section.note-item',
     '.note-item',

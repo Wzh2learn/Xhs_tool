@@ -19,6 +19,7 @@ xhs_automation/
 │   ├── ai.ts                # AI 智能分析
 │   ├── database.ts          # 数据库操作（JSON）
 │   ├── logger.ts            # 日志系统
+│   ├── xhsInitialState.ts   # __INITIAL_STATE__ 抽取工具（feed/search/detail/profile）
 │   └── index.ts             # 统一导出接口
 │
 ├── content/                  # 📝 内容管理
@@ -34,6 +35,7 @@ xhs_automation/
 ├── index.ts                  # 🔍 情报搜集主程序
 ├── login.ts                  # 🔐 登录工具
 ├── publisher.ts              # 🚀 发布工具
+├── tool.ts                   # 🧰 工具式入口（list/search/detail/profile）
 ├── test_all.ts               # 🧪 测试套件
 │
 ├── .env                      # 🔑 环境变量（不提交）
@@ -101,7 +103,8 @@ graph TD
     ↓
 循环搜索关键词
     ├─> 搜索结果页
-    ├─> 点击进入详情
+    ├─> 优先 __INITIAL_STATE__ 抽取 feed/search
+    ├─> 进入详情页（__INITIAL_STATE__ 解析详情；失败则 DOM 兜底）
     ├─> 提取正文内容
     ├─> OCR 识别图片（可选）
     ├─> 提取评论

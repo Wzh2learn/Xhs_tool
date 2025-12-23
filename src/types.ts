@@ -15,9 +15,12 @@ export interface NoteInfo {
   title: string;
   author: string;
   authorLink: string;
+  authorId?: string;
+  authorRedId?: string;
   likes: string;
   link: string;
   noteId: string;
+  xsecToken?: string;
   content: string;
   fullContent: string;
   tags: string[];

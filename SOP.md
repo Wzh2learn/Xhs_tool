@@ -189,6 +189,7 @@ content/drafts/
 | Cookie 过期 | `npx tsx login.ts` |
 | 搜集情报 | `npx tsx index.ts` |
 | 发布笔记 | `npx tsx publisher.ts` |
+| 工具接口（list/search/detail/profile） | `npx tsx tool.ts listFeeds` |
 | 测试 v5.0 功能 | `npx tsx test_v5_features.ts` |
 
 ---

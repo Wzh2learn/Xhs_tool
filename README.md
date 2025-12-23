@@ -16,6 +16,8 @@
 | 📡 **实时监控** | Socket.io 推送日志，前端终端实时滚动 |
 | 🛡️ **并发防护** | Dashboard 进程锁，防止 Scout/Publish 同时运行 |
 | ⛔ **一键 Kill** | Dashboard 提供 Kill Task 按钮，终止卡死任务 |
+| 🧰 **Tool API** | Dashboard 提供 `/api/tool`，以“工具接口”方式调用 `list/search/detail/profile` |
+| 🧩 **__INITIAL_STATE__ 解析** | 优先从 `window.__INITIAL_STATE__` 抽取 feed/search/detail/profile，DOM 方案作为兜底 |
 
 ### ✅ v5.1 功能 (延续)
 | 功能 | 说明 |
@@ -117,6 +119,20 @@ DEEPSEEK_MODEL=deepseek-chat
 - `npx tsx index.ts`
 - `npx tsx publisher.ts`
 
+### 工具化接口（Tool）
+
+**CLI：**
+
+- `npx tsx tool.ts listFeeds`
+- `npx tsx tool.ts searchFeeds "{\"keyword\":\"推荐系统\"}"`
+- `npx tsx tool.ts getFeedDetail "{\"feedId\":\"<id>\",\"xsecToken\":\"<token可选>\"}"`
+- `npx tsx tool.ts userProfile "{\"userId\":\"<id>\",\"xsecToken\":\"<token可选>\"}"`
+
+**Dashboard HTTP：**
+
+- `GET /api/tool?action=listFeeds`
+- `GET /api/tool?action=searchFeeds&params={"keyword":"推荐系统"}`
+
 ### 准备内容（发布前）
 
 将 Markdown 文件和**同名配图**放入 `content/drafts/` 目录：
@@ -146,6 +162,7 @@ d:\AIlearn\xhs_automation\
 │   ├── utils.ts          # 通用工具函数
 │   ├── ocr.ts            # OCR 图片识别
 │   ├── ai.ts             # AI 智能分析
+│   ├── xhsInitialState.ts # __INITIAL_STATE__ 抽取工具
 │   └── database.ts       # 数据库操作
 ├── content/
 │   ├── drafts/           # 待发布 (放这里)
@@ -155,6 +172,7 @@ d:\AIlearn\xhs_automation\
 ├── index.ts              # 情报搜集主程序
 ├── publisher.ts          # 发布工具
 ├── login.ts              # 登录工具
+├── tool.ts               # 工具式入口（list/search/detail/profile）
 └── .env.example          # 环境变量模板
 ```
 
