@@ -7,6 +7,7 @@ import * as path from 'path';
 import { SAFETY_CONFIG, COOKIES_PATH } from './config';
 import { logger } from './logger';
 import UserAgent from 'user-agents';
+import { NoteInfo } from './types';
 
 // === 延时函数 ===
 
@@ -204,6 +205,81 @@ export async function humanScroll(page: Page): Promise<void> {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
     await delay(800 + Math.random() * 500);
+  }
+}
+
+/**
+ * 根据笔记的互动量 (点赞数、内容长度) 计算拟人化阅读延迟
+ * 核心逻辑：高质量、长内容的笔记停留更久，低质量笔记快速划过
+ */
+export async function engagementAwareDelay(note: Partial<NoteInfo>): Promise<number> {
+  const baseTime = SAFETY_CONFIG.BASE_READ_TIME_MIN + 
+                   Math.random() * (SAFETY_CONFIG.BASE_READ_TIME_MAX - SAFETY_CONFIG.BASE_READ_TIME_MIN);
+  
+  // 1. 处理评论数量加成 (更真实地反映相关性和互动深度)
+  const commentCount = (note.comments || []).length;
+  const commentBonus = commentCount * SAFETY_CONFIG.TIME_PER_COMMENT;
+
+  // 2. 处理内容长度加成
+  const contentLen = (note.fullContent || note.content || '').length;
+  const contentBonus = contentLen * SAFETY_CONFIG.TIME_PER_CHAR;
+
+  // 3. 计算总时间并应用上限
+  let totalDelay = baseTime + commentBonus + contentBonus;
+  totalDelay = Math.min(totalDelay, SAFETY_CONFIG.MAX_READ_TIME);
+  
+  // 添加 ±10% 的随机抖动
+  const jitter = totalDelay * 0.1 * (Math.random() * 2 - 1);
+  totalDelay += jitter;
+
+  logger.debug(`[engagementAwareDelay] 笔记: "${(note.title || '').substring(0, 15)}...", 评论数: ${commentCount}, 长度: ${contentLen}, 计算延迟: ${Math.round(totalDelay/1000)}s`);
+  
+  await delay(totalDelay);
+  return totalDelay;
+}
+
+/**
+ * 模拟人类在详情页滚动看评论的行为
+ */
+export async function humanScrollComments(page: Page, scrollTimes: number = 2): Promise<void> {
+  const commentSelector = '.comment-item, [class*="comment-item"], .comments-container';
+  try {
+    const hasComments = await page.$(commentSelector);
+    if (!hasComments) return;
+
+    logger.debug(`[humanScrollComments] 发现评论区，模拟翻看评论 ${scrollTimes} 次...`);
+    for (let i = 0; i < scrollTimes; i++) {
+      const scrollDistance = 200 + Math.floor(Math.random() * 400);
+      await page.evaluate((dist) => {
+        const container = document.querySelector('.note-detail-mask') || window;
+        container.scrollBy({ top: dist, behavior: 'smooth' });
+      }, scrollDistance);
+      await delay(1000 + Math.random() * 2000);
+    }
+  } catch (err) {
+    logger.warn('模拟看评论失败', err);
+  }
+}
+
+/**
+ * 模拟翻看多图笔记的行为
+ */
+export async function humanPagination(page: Page): Promise<void> {
+  if (Math.random() > SAFETY_CONFIG.PAGINATION_PROBABILITY) return;
+
+  const nextBtnSelector = '.note-detail-mask .swiper-button-next, [class*="note-detail"] .swiper-button-next, .right-arrow';
+  try {
+    const nextBtn = await page.$(nextBtnSelector);
+    if (nextBtn) {
+      const browseCount = 1 + Math.floor(Math.random() * 3);
+      logger.debug(`[humanPagination] 模拟翻看图片/页面 (${browseCount} 次)...`);
+      for (let k = 0; k < browseCount; k++) {
+        await nextBtn.click();
+        await delay(1500 + Math.random() * 1500);
+      }
+    }
+  } catch (err) {
+    logger.warn('模拟翻页失败', err);
   }
 }
 

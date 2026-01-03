@@ -56,3 +56,10 @@ export interface SaveResult {
   newCount: number;
   skipped: number;
 }
+
+export interface SyncBundle {
+  timestamp: string;
+  questions: QuestionItem[];
+  hotTopics: { topic: string; count: number }[];
+  companyIntel: Record<string, string[]>;
+}

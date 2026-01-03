@@ -57,6 +57,19 @@ export const SAFETY_CONFIG = {
   DETAIL_READ_MIN: 15000,
   DETAIL_READ_MAX: 30000,
   
+  // === Engagement-Aware 配置 ===
+  // 基础阅读时间 (对于极短或无赞笔记)
+  BASE_READ_TIME_MIN: 5000,
+  BASE_READ_TIME_MAX: 8000,
+  // 每条评论增加的时间 (毫秒)
+  TIME_PER_COMMENT: 1500,
+  // 每个字符增加的时间 (毫秒)
+  TIME_PER_CHAR: 8,
+  // 翻页概率 (如果有图片)
+  PAGINATION_PROBABILITY: 0.7,
+  // 最大阅读时间上限 (80秒，深读可能较长)
+  MAX_READ_TIME: 80000,
+  
   // 关键词搜索间隔 (20-40秒)
   KEYWORD_INTERVAL_MIN: 20000,
   KEYWORD_INTERVAL_MAX: 40000,

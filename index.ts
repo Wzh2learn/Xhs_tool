@@ -22,6 +22,7 @@ import {
   generateAIReport,
   expandKeywordsWithAI,
   saveToDatabase,
+  generateSyncBundle,
   NoteInfo,
   Logger,
   applyStealthProfile,
@@ -193,6 +194,16 @@ async function main(): Promise<void> {
       const dbPath = path.join(DATA_DIR, 'interview_questions.json');
       const result = saveToDatabase(allNotes, dbPath);
       logger.info(`📊 数据库更新: 总计 ${result.total} 条, 新增 ${result.newCount} 条, 跳过 ${result.skipped} 条`);
+      
+      logger.info('🔄 正在生成 AlgoQuest 同步数据包...');
+      const bundle = generateSyncBundle(dbPath);
+      if (bundle) {
+        const bundlePath = path.join(DATA_DIR, 'algoquest_sync.json');
+        fs.writeFileSync(bundlePath, JSON.stringify(bundle, null, 2));
+        logger.info(`✅ 同步数据包已生成: ${bundlePath}`);
+        logger.info('💡 请在 AlgoQuest3 中导入此文件以同步情报。');
+      }
+
       await generateDailyReport(allNotes);
     }
 

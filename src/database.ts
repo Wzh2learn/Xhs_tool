@@ -3,7 +3,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { NoteInfo, QuestionItem, SaveResult } from './types';
+import { NoteInfo, QuestionItem, SaveResult, SyncBundle } from './types';
 import { logger } from './logger';
 import { atomicWriteJsonSync } from './utils';
 
@@ -92,4 +92,56 @@ export function saveToDatabase(notes: NoteInfo[], dbPath: string): SaveResult {
     newCount,
     skipped,
   };
+}
+
+/** 
+ * 生成 AlgoQuest 兼容的同步数据包 
+ */
+export function generateSyncBundle(dbPath: string): SyncBundle | null {
+  if (!fs.existsSync(dbPath)) return null;
+
+  try {
+    const questions: QuestionItem[] = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
+    
+    // 1. 提取热点话题 (基于标签和关键词)
+    const topicMap = new Map<string, number>();
+    questions.forEach(q => {
+      q.tags.forEach(tag => {
+        const cleanTag = tag.replace('#', '').trim();
+        if (cleanTag.length > 1) {
+          topicMap.set(cleanTag, (topicMap.get(cleanTag) || 0) + 1);
+        }
+      });
+    });
+    const hotTopics = Array.from(topicMap.entries())
+      .map(([topic, count]) => ({ topic, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // 2. 提取公司情报
+    const companyIntel: Record<string, string[]> = {};
+    const companies = ['字节', '阿里', '腾讯', '百度', '美团', '快手', '小红书', '京东', '拼多多', 'Shopee'];
+    
+    questions.forEach(q => {
+      const foundCompany = companies.find(c => q.title.includes(c) || q.full_text.includes(c));
+      if (foundCompany) {
+        if (!companyIntel[foundCompany]) companyIntel[foundCompany] = [];
+        // 提取摘要作为情报点
+        const intelPoint = q.summary.split('\n')[0].substring(0, 100);
+        if (intelPoint && !companyIntel[foundCompany].includes(intelPoint)) {
+          companyIntel[foundCompany].push(intelPoint);
+        }
+      }
+    });
+
+    return {
+      timestamp: new Date().toISOString(),
+      questions: questions.slice(-20), // 仅带上最近20条，避免数据过载
+      hotTopics,
+      companyIntel
+    };
+  } catch (err) {
+    logger.error('生成同步数据包失败', err);
+    return null;
+  }
 }

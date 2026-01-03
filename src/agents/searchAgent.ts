@@ -12,6 +12,9 @@ import {
   recognizeImage,
   Logger,
   NoteInfo,
+  engagementAwareDelay,
+  humanScrollComments,
+  humanPagination,
   extractSearchFeeds,
   extractFeedDetail,
   XhsFeed,
@@ -52,8 +55,12 @@ export async function searchNotes(page: Page, keyword: string, opts: AgentContex
       for (let i = 0; i < limited.length; i++) {
         const feed = limited[i];
         const note = await collectByDetail(page, feed, { logger });
-        if (note) notes.push(note);
-        await randomDelay(SAFETY_CONFIG.DETAIL_READ_MIN, SAFETY_CONFIG.DETAIL_READ_MAX);
+        if (note) {
+          notes.push(note);
+          await humanPagination(page);
+          await humanScrollComments(page);
+          await engagementAwareDelay(note);
+        }
       }
 
       if (notes.length > 0) return notes;
@@ -476,7 +483,7 @@ async function collectByDom(page: Page, keyword: string, logger: AgentLogger): P
         }
       }
 
-      notes.push({
+      const note: NoteInfo = {
         keyword,
         title,
         author,
@@ -488,11 +495,14 @@ async function collectByDom(page: Page, keyword: string, logger: AgentLogger): P
         fullContent,
         tags,
         comments
-      });
+      };
 
+      notes.push(note);
       logger.info(`✅ 采集完成: ${title.substring(0, 30)}... (${comments.length}条评论)`);
 
-      await randomDelay(SAFETY_CONFIG.DETAIL_READ_MIN, SAFETY_CONFIG.DETAIL_READ_MAX);
+      await humanPagination(page);
+      await humanScrollComments(page);
+      await engagementAwareDelay(note);
       await page.keyboard.press('Escape');
       await delay(1000 + Math.random() * 1000);
 

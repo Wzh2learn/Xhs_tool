@@ -8,6 +8,9 @@ import {
   extractNoteId,
   Logger,
   NoteInfo,
+  engagementAwareDelay,
+  humanScrollComments,
+  humanPagination,
   extractFeedList,
   extractFeedDetail,
   XhsFeed,
@@ -47,8 +50,12 @@ export async function browseFeed(page: Page, opts: AgentContext = {}): Promise<N
       for (let i = 0; i < feedCount && startIdx + i < feeds.length; i++) {
         const feed = feeds[startIdx + i];
         const note = await collectFeedDetail(page, feed, { logger });
-        if (note) notes.push(note);
-        await randomDelay(SAFETY_CONFIG.DETAIL_READ_MIN, SAFETY_CONFIG.DETAIL_READ_MAX);
+        if (note) {
+          notes.push(note);
+          await humanPagination(page);
+          await humanScrollComments(page);
+          await engagementAwareDelay(note);
+        }
       }
 
       if (notes.length > 0) {
@@ -332,7 +339,7 @@ async function collectFeedByDom(page: Page, logger: AgentLogger): Promise<NoteIn
 
       const fullContent = content || `[图片笔记] ${title}`;
 
-      notes.push({
+      const note: NoteInfo = {
         keyword: '[Feed流]',
         title,
         author,
@@ -344,11 +351,15 @@ async function collectFeedByDom(page: Page, logger: AgentLogger): Promise<NoteIn
         fullContent,
         tags,
         comments: []
-      });
+      };
+
+      notes.push(note);
 
       logger.info(`📱 Feed 采集完成: ${title.substring(0, 25)}...`);
 
-      await randomDelay(SAFETY_CONFIG.DETAIL_READ_MIN, SAFETY_CONFIG.DETAIL_READ_MAX);
+      await humanPagination(page);
+      await humanScrollComments(page);
+      await engagementAwareDelay(note);
 
       if (Math.random() < 0.4) {
         try {
