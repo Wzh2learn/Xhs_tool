@@ -8,14 +8,15 @@
 
 ## 🌅 09:00 情报搜集 (The Scout) — Dashboard 流程
 
-1. 打开 Dashboard: `http://localhost:3000` → 确认 WS Online。
-2. 点击 **🕵️ Scout**，终端开始滚动日志。
-3. 去喝咖啡，等待完成提示。
+1. 启动 Dashboard: `npm run dashboard`
+2. 浏览器访问 `http://localhost:3000`
+3. 顶部操作栏点击 **🕵️ 情报搜集**，实时日志在总览面板显示
+4. 去喝咖啡，等待完成提示
 
 ### 产出
 
-- **日报文件**: `reports/daily_YYYY-MM-DD.md` （Dashboard 底部 **Daily Report** 标签页可直接预览）
-- **题库文件**: `data/interview_questions.json` （Dashboard 底部 **Database** 标签页可直接预览）
+- **日报文件**: `reports/daily_YYYY-MM-DD.md`（左侧导航「情报日报」查看）
+- **题库文件**: `data/interview_questions.json`（左侧导航「数据库」查看）
 - **内容**: 3 个关键词 × 3 篇笔记 + 2 次 Feed 推荐 (各1-2篇) = **约 12 篇笔记**
 - **每篇包含**: 
   - 标题、作者、点赞数、标签
@@ -35,8 +36,8 @@
 
 ### 关键动作
 
-1. **打开 Dashboard → Database 标签**：直接查看 `data/interview_questions.json`
-2. **阅读日报摘要**：Dashboard → Daily Report 标签
+1. **打开 Dashboard → 左侧导航「数据库」**：直接查看 `data/interview_questions.json`
+2. **阅读日报摘要**：左侧导航「情报日报」
 3. **🔥 重点：阅读"💬 社区热议"板块**：
    - 评论区的追问往往是**最高价值的面试考点**
    - 例如：如果大家都在问"Embedding 维度是多少？"——这就是你笔记必须回答的问题
@@ -49,6 +50,19 @@ content/drafts/
 ├── today.md      ← 你的拆解文案
 └── today.jpg     ← 配图 (必须同名!)
 ```
+
+### 改写工坊使用流程（推荐）
+
+如果你有现成素材（复盘、项目、面试经历、碎碎念等），使用 Dashboard 左侧导航「改写工坊」生成草稿：
+
+1. Dashboard 左侧导航栏 → 点击「改写工坊」
+2. 粘贴素材或上传 `.txt` 到左侧输入区
+3. 点击「开始改写」或按 `Ctrl+Enter`
+4. 从候选标题栏选择标题，自动填充到下方标题输入框
+5. 在右侧输出区顶部调整标签和文件名
+6. 点击「导出草稿」或按 `Ctrl+S`，自动保存到 `content/drafts/*.md`
+
+> 导出后的 Markdown 将被 `publisher.ts` 按"第一行标题 + 标签行 + 正文"的规则解析。
 
 ### 策略升级：回答评论区追问
 
@@ -111,7 +125,7 @@ content/drafts/
 
 ### 关键动作
 
-1. **打开 JSON 数据**：Dashboard → Database 标签（无需手动打开文件）
+1. **打开 JSON 数据**：Dashboard → 左侧导航「数据库」（无需手动打开文件）
 2. **挑选 1-2 道高质量问题**：
    - 优先选择 `hot_comments` 有追问的题目
    - 这些追问往往是面试官真正关心的细节
@@ -149,8 +163,8 @@ content/drafts/
 
 ### Dashboard 操作
 1. 确认草稿已放在 `content/drafts/`（MD+同名图片）。
-2. 打开 Dashboard，点击 **🚀 Publish**。
-3. 观察终端日志，等待成功提示。
+2. Dashboard 顶部操作栏点击 **🚀 内容发布**。
+3. 观察总览面板实时日志，等待成功提示。
 
 ### 自动流程
 1. 扫描 `content/drafts/` 目录

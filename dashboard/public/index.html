@@ -3,55 +3,349 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XHS Command Center</title>
+  <title>XHS 控制中心</title>
   <link rel="stylesheet" href="/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <div class="app-shell">
-    <header class="status-bar">
-      <div class="brand">XHS / Command Center</div>
-      <div class="badges">
-        <span class="badge" id="conn-status">WS: connecting...</span>
-        <span class="badge" id="run-status">Idle</span>
-      </div>
-    </header>
-
-    <section class="controls">
-      <button class="action-btn" id="btn-login">🔑 Login (v3)</button>
-      <button class="action-btn" id="btn-scout">🕵️ Scout (Intelligence)</button>
-      <button class="action-btn" id="btn-publish">🚀 Publish (Distribution)</button>
-      <button class="action-btn danger" id="btn-kill">⛔ Kill Task</button>
-    </section>
-
-    <section class="terminal-card">
-      <div class="card-head">
-        <div class="title">Live Terminal</div>
-        <div class="actions">
-          <button class="chip" id="clear-log">Clear</button>
+  <div class="app">
+    <!-- 左侧导航栏 -->
+    <aside class="nav-sidebar">
+      <div class="nav-brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+          <span>XHS 控制中心</span>
         </div>
       </div>
-      <pre id="terminal" class="terminal"></pre>
-    </section>
+      
+      <nav class="nav-menu">
+        <button class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span>总览面板</span>
+        </button>
+        <button class="nav-item" data-view="report">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          <span>情报日报</span>
+        </button>
+        <button class="nav-item" data-view="database">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+          </svg>
+          <span>数据库</span>
+        </button>
+        <button class="nav-item" data-view="rewrite">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          <span>改写工坊</span>
+        </button>
+      </nav>
 
-    <section class="tabs-card">
-      <div class="tabs">
-        <button class="tab active" data-tab="report">📄 Daily Report</button>
-        <button class="tab" data-tab="database">💾 Database</button>
+      <div class="nav-footer">
+        <div class="status-card">
+          <div class="status-row">
+            <span class="status-dot" id="conn-dot"></span>
+            <span class="status-text" id="conn-status">连接中...</span>
+          </div>
+          <div class="status-row">
+            <span class="status-badge" id="run-status">就绪</span>
+          </div>
+        </div>
       </div>
-      <div class="tab-body" id="tab-report">
-        <div id="report" class="markdown"></div>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 顶部操作栏 -->
+      <header class="top-bar">
+        <div class="page-title">
+          <h1 id="page-title">总览面板</h1>
+          <p class="page-subtitle">管理和监控你的小红书自动化任务</p>
+        </div>
+        <div class="action-bar">
+          <button class="action-btn primary" id="btn-login">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M13.8 12H3"/>
+            </svg>
+            <span>登录</span>
+          </button>
+          <button class="action-btn primary" id="btn-scout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <span>情报搜集</span>
+          </button>
+          <button class="action-btn primary" id="btn-publish">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+            </svg>
+            <span>内容发布</span>
+          </button>
+          <button class="action-btn primary" id="btn-rewrite-nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            <span>改写工坊</span>
+          </button>
+          <button class="action-btn danger" id="btn-kill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>
+            </svg>
+            <span>停止</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 视图内容区 -->
+      <div class="content-area">
+        <!-- 总览面板 -->
+        <div class="view active" id="view-dashboard">
+          <div class="bento-grid">
+            <!-- 今日概览卡片 -->
+            <div class="bento-card stats-card">
+              <h3>今日概览</h3>
+              <div class="stats-grid">
+                <div class="stat-item">
+                  <span class="stat-value" id="stat-notes">0</span>
+                  <span class="stat-label">采集笔记</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value" id="stat-db">0</span>
+                  <span class="stat-label">数据库条目</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value" id="stat-drafts">0</span>
+                  <span class="stat-label">草稿数量</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 实时日志卡片 -->
+            <div class="bento-card terminal-card">
+              <div class="card-header">
+                <h3>实时日志</h3>
+                <button class="icon-btn" id="clear-log" title="清空日志">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="terminal-wrapper">
+                <pre id="terminal" class="terminal"></pre>
+              </div>
+            </div>
+
+            <!-- 快捷入口卡片 -->
+            <div class="bento-card links-card">
+              <h3>快捷入口</h3>
+              <div class="links-list">
+                <a href="#" class="link-item" data-view="rewrite">
+                  <span class="link-icon">✍️</span>
+                  <span>改写工坊</span>
+                  <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"/>
+                  </svg>
+                </a>
+                <a href="#" class="link-item" data-view="report">
+                  <span class="link-icon">📊</span>
+                  <span>情报日报</span>
+                  <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"/>
+                  </svg>
+                </a>
+                <a href="#" class="link-item" data-view="database">
+                  <span class="link-icon">🗄️</span>
+                  <span>数据库</span>
+                  <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
+
+            <!-- 使用提示卡片 -->
+            <div class="bento-card tips-card prominent">
+              <div class="tips-header">
+                <span class="tips-icon">💡</span>
+                <h3>快速入门指南</h3>
+              </div>
+              <div class="tips-list">
+                <div class="tip-item">
+                  <span class="tip-number">1</span>
+                  <span class="tip-text"><strong>登录账号</strong> - 首次使用点击顶部"登录"获取 Cookie</span>
+                </div>
+                <div class="tip-item">
+                  <span class="tip-number">2</span>
+                  <span class="tip-text"><strong>情报搜集</strong> - 自动采集面经生成日报和数据库</span>
+                </div>
+                <div class="tip-item">
+                  <span class="tip-number">3</span>
+                  <span class="tip-text"><strong>改写工坊</strong> - 粘贴素材，AI 改写后导出草稿</span>
+                </div>
+                <div class="tip-item">
+                  <span class="tip-number">4</span>
+                  <span class="tip-text"><strong>内容发布</strong> - 自动读取 drafts 目录并发布到小红书</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 情报日报 -->
+        <div class="view" id="view-report">
+          <div class="content-card">
+            <div class="card-header">
+              <h2>情报日报</h2>
+              <div class="header-actions">
+                <button class="btn btn-ghost btn-sm" id="refresh-report">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                  </svg>
+                  刷新
+                </button>
+              </div>
+            </div>
+            <div id="report" class="markdown-content"></div>
+          </div>
+        </div>
+
+        <!-- 数据库 -->
+        <div class="view" id="view-database">
+          <div class="content-card database-card">
+            <div class="card-header">
+              <h2>数据库</h2>
+              <div class="header-actions">
+                <button class="btn btn-ghost btn-sm" id="refresh-db">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                  </svg>
+                  刷新
+                </button>
+              </div>
+            </div>
+            <div class="database-content">
+              <div id="database-stats" class="db-stats-bar"></div>
+              <div id="database-list" class="db-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 改写工坊 - 全宽工作区 -->
+        <div class="view" id="view-rewrite">
+          <div class="rewrite-workspace">
+            <!-- 主标题区 -->
+            <div class="rewrite-main-title">
+              <input id="rewrite-title" class="title-input-main" placeholder="📝 输入或选择标题..." />
+            </div>
+
+            <!-- 候选标题栏 - 移到编辑区上方 -->
+            <div class="headlines-bar">
+              <span class="headlines-label">💡 候选标题（点击选择）：</span>
+              <div id="rewrite-headlines" class="headline-list">
+                <span class="headline-placeholder">点击左侧"开始改写"生成标题建议</span>
+              </div>
+            </div>
+
+            <!-- 编辑区 -->
+            <div class="editor-grid">
+              <!-- 左侧：输入 -->
+              <div class="editor-pane input-pane">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <h4>输入素材</h4>
+                    <span class="hint">粘贴你想改写的内容，支持实习复盘、项目分享、日常碎碎念</span>
+                  </div>
+                  <div class="pane-actions">
+                    <label class="btn btn-outline btn-sm">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                      </svg>
+                      上传
+                      <input type="file" id="rewrite-file" accept=".txt,text/plain" hidden />
+                    </label>
+                    <button class="btn btn-ghost btn-sm" id="rewrite-clear">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                      </svg>
+                      清空
+                    </button>
+                  </div>
+                </div>
+                <div id="rewrite-welcome" class="welcome-banner hidden"></div>
+                <textarea id="rewrite-material" class="editor-textarea" placeholder="把你的素材粘贴在这里...
+
+支持：
+- 实习复盘
+- 项目分享  
+- 日常碎碎念
+- 任何你想改写的内容
+
+快捷键：
+Ctrl + Enter = 开始改写"></textarea>
+                <div class="pane-footer">
+                  <button class="btn btn-primary btn-lg" id="rewrite-run">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5,3 19,12 5,21 5,3"/>
+                    </svg>
+                    开始改写
+                  </button>
+                </div>
+              </div>
+
+              <!-- 右侧：输出 -->
+              <div class="editor-pane output-pane">
+                <div class="pane-header">
+                  <div class="pane-title-group">
+                    <h4>改写结果</h4>
+                    <span id="rewrite-type" class="type-badge">准备就绪</span>
+                  </div>
+                  <div class="pane-actions">
+                    <input id="rewrite-tags" class="tag-input" placeholder="#标签1 #标签2" />
+                    <input id="rewrite-slug" class="slug-input" placeholder="文件名" />
+                  </div>
+                </div>
+                <textarea id="rewrite-content" class="editor-textarea" placeholder="改写后的内容将显示在这里...
+
+你可以：
+- 继续编辑和润色
+- 点击上方候选标题快速填充
+- 添加标签优化搜索
+- Ctrl+S 导出为草稿"></textarea>
+                <div class="pane-footer">
+                  <button class="btn btn-success btn-lg" id="rewrite-export">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                      <polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/>
+                    </svg>
+                    导出草稿 (Ctrl+S)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 导出结果提示 -->
+            <div id="rewrite-export-result" class="export-toast hidden"></div>
+          </div>
+        </div>
       </div>
-      <div class="tab-body hidden" id="tab-database">
-        <pre id="database" class="json-view"></pre>
-      </div>
-    </section>
+    </main>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/vendor/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

@@ -18,6 +18,7 @@
 | ⛔ **一键 Kill** | Dashboard 提供 Kill Task 按钮，终止卡死任务 |
 | 🧰 **Tool API** | Dashboard 提供 `/api/tool`，以“工具接口”方式调用 `list/search/detail/profile` |
 | 🧩 **__INITIAL_STATE__ 解析** | 优先从 `window.__INITIAL_STATE__` 抽取 feed/search/detail/profile，DOM 方案作为兜底 |
+| ✍️ **Rewrite Studio** | Dashboard 新增改写工作台：粘贴/上传素材 → AI 改写 → 预览 → 导出到 `content/drafts/` |
 
 ### ✅ v5.1 功能 (延续)
 | 功能 | 说明 |
@@ -87,13 +88,58 @@ npm run dashboard
 ```
 http://localhost:3000
 ```
-在页面点击：
-- 🔑 Login：扫码获取 Cookie（只需偶尔执行）
-- 🕵️ Scout：自动情报搜集（生成日报 + 题库）
-- 🚀 Publish：读取 drafts 并自动发布
-- ⛔ Kill Task：终止卡住的进程
 
-> 日报与题库预览：界面底部的 Tabs（Daily Report / Database）
+### �️ Dashboard 界面布局
+
+```
+┌─────────────────────────────────────────────────┐
+│  左侧导航栏    │  顶部操作栏 (登录/搜集/发布/停止) │
+│  ┌─────────┐  ├─────────────────────────────────┤
+│  │ Logo    │  │ 页面标题 + 副标题                 │
+│  ├─────────┤  ├─────────────────────────────────┤
+│  │ 总览面板 │  │                                 │
+│  │ 情报日报 │  │     Bento Grid 内容区            │
+│  │ 数据库   │  │     (统计/日志/快捷入口/提示)     │
+│  │ 改写工坊 │  │                                 │
+│  ├─────────┤  │                                 │
+│  │ 状态指示 │  │                                 │
+│  └─────────┘  └─────────────────────────────────┘
+```
+
+**功能分布说明：**
+
+| 区域 | 功能 | 说明 |
+|------|------|------|
+| **左侧导航栏** | 视图切换 | 总览面板、情报日报、数据库、改写工坊 |
+| **顶部操作栏** | 核心操作 | 🔑 登录、🕵️ 情报搜集、🚀 内容发布、⛔ 停止任务 |
+| **总览面板** | 数据概览 | 今日采集统计、实时日志、快捷入口、使用提示 |
+| **情报日报** | 内容查看 | 查看自动生成的面经分析报告 |
+| **数据库** | 数据管理 | 查看本地题库 JSON 数据 |
+| **改写工坊** | 内容创作 | AI 改写素材、生成标题、导出草稿 |
+
+### ✍️ 改写工坊使用流程
+
+左侧导航点击「改写工坊」进入：
+
+1. **输入素材**：粘贴文本或上传 `.txt` 文件
+2. **AI 改写**：点击「开始改写」或按 `Ctrl+Enter`
+3. **选择标题**：从候选标题中选择或手动输入
+4. **调整标签**：在输出区顶部输入标签
+5. **导出草稿**：点击「导出草稿」或按 `Ctrl+S`，保存到 `content/drafts/`
+
+导出格式：
+```markdown
+# 标题
+#tag1 #tag2 #tag3
+
+正文内容...
+```
+
+后端接口：
+
+- `GET /api/rewrite/welcome`
+- `POST /api/rewrite`（body: `{ material, maxHeadlines }`）
+- `POST /api/rewrite/export`（body: `{ title, rewrite, tags, slug }`）
 
 ### 可选：配置环境变量
 
@@ -111,6 +157,8 @@ DEEPSEEK_API_KEY=sk-your-deepseek-key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
 ```
+
+> 兼容说明：项目同时兼容旧版 `AI_API_BASE/AI_API_KEY/AI_MODEL`，但推荐使用 `DEEPSEEK_*`。
 
 > 💡 不配置 AI 也能运行，会跳过 AI 关键词扩展和智能分析
 

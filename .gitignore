@@ -27,3 +27,10 @@ Thumbs.db
 
 # 日志
 *.log
+
+# Local secrets / generated artifacts
+xhs_cookies.json.bak
+xhs_cookies.json.*
+dashboard/public/*.bak
+content/drafts/
+content/*.tmp

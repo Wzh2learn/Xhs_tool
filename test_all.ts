@@ -190,7 +190,7 @@ async function runTests() {
   console.log('\n📦 5. ocr.ts - OCR 模块');
   const ocr = await import('./src/ocr');
   
-  test('extractTextFromImage 是异步函数', () => typeof ocr.extractTextFromImage === 'function');
+  test('recognizeImage 是异步函数', () => typeof ocr.recognizeImage === 'function');
   test('extractOCRFromImages 是异步函数', () => typeof ocr.extractOCRFromImages === 'function');
   test('humanViewImages 是异步函数', () => typeof ocr.humanViewImages === 'function');
 

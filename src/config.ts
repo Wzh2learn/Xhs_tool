@@ -22,9 +22,9 @@ export const PUBLISHED_DIR = path.join(PROJECT_ROOT, 'content/published');
 
 // === AI API 配置 (DeepSeek) ===
 export const AI_CONFIG = {
-  API_BASE: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
-  API_KEY: process.env.DEEPSEEK_API_KEY || '',
-  MODEL: process.env.DEEPSEEK_MODEL || 'deepseek-reasoner',
+  API_BASE: process.env.DEEPSEEK_BASE_URL || process.env.AI_API_BASE || 'https://api.deepseek.com',
+  API_KEY: process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY || '',
+  MODEL: process.env.DEEPSEEK_MODEL || process.env.AI_MODEL || 'deepseek-reasoner',
   TIMEOUT: 60000,  // reasoner 模型可能需要更长时间
   RETRIES: 2,
   get isConfigured(): boolean {
