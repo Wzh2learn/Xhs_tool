@@ -328,3 +328,20 @@ DEEPSEEK_MODEL=deepseek-chat
 # 运行 43 项自动化测试，验证所有模块正常
 npx tsx test_all.ts
 ```
+
+## Creator Assistant Daily SOP (Added 2026-02-21)
+
+Use this after collecting materials, before posting:
+
+1. Open `Dashboard -> 改写工坊 -> 创作者助手`
+2. Click `刷新选题`, pick one topic and fill title/material
+3. Generate rewrite result, then click `一键检查`
+4. If score < 80: improve title/paragraphs/tags/CTA and re-check
+5. Click `生成` in publish pack and copy into publish flow
+6. After posting, fill `轻复盘` in 30 seconds and save
+
+Rules for solo use:
+
+- Keep workflow light, do not over-design metrics
+- Focus on consistency and personal voice
+- Use official Xiaohongshu tools for platform-level analytics

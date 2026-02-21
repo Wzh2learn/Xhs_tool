@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const REPORT_PATH = path.join(PROJECT_ROOT, 'reports', 'daily_trends.md');
 const DB_PATH = path.join(PROJECT_ROOT, 'data', 'interview_questions.json');
+const REVIEWS_PATH = path.join(PROJECT_ROOT, 'data', 'creator_reviews.json');
 const PORT = Number(process.env.PORT) || 3000;
 
 const app = express();
@@ -154,6 +155,79 @@ function sanitizeSlug(slug: string): string {
   return cleaned || makeDefaultSlug();
 }
 
+function toQuestionArray(raw: any): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.questions)) return raw.questions;
+  return [];
+}
+
+function parseMetric(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+  const text = String(value ?? '').trim().toLowerCase();
+  if (!text) return 0;
+
+  const cleaned = text.replace(/[,，]/g, '');
+  const numberValue = Number(cleaned);
+  if (Number.isFinite(numberValue)) return Math.max(0, numberValue);
+
+  const match = cleaned.match(/^(\d+(?:\.\d+)?)(w|k|万)?\+?$/i);
+  if (!match) return 0;
+  const base = Number(match[1]);
+  const unit = match[2];
+  if (!Number.isFinite(base)) return 0;
+  if (unit === 'w' || unit === '万') return Math.round(base * 10000);
+  if (unit === 'k') return Math.round(base * 1000);
+  return Math.round(base);
+}
+
+function computeTopicSuggestion(item: any) {
+  const likes = parseMetric(item?.likes);
+  const comments = Array.isArray(item?.hot_comments) ? item.hot_comments : [];
+  const tags = Array.isArray(item?.tags) ? item.tags.map((t: unknown) => String(t)) : [];
+  const summary = String(item?.summary || item?.full_text || '').trim();
+  const crawledAt = new Date(String(item?.crawled_at || ''));
+  const daysAgo = Number.isNaN(crawledAt.getTime())
+    ? 30
+    : Math.max(0, Math.floor((Date.now() - crawledAt.getTime()) / (1000 * 60 * 60 * 24)));
+
+  const freshnessScore = daysAgo <= 3 ? 20 : daysAgo <= 7 ? 14 : daysAgo <= 14 ? 8 : 4;
+  const heatScore = Math.min(35, Math.round(Math.log10(likes + 1) * 14));
+  const discussionScore = Math.min(20, comments.length * 4);
+  const clarityScore = summary.length >= 120 ? 15 : summary.length >= 60 ? 10 : 5;
+  const score = Math.min(100, freshnessScore + heatScore + discussionScore + clarityScore);
+
+  const reasons: string[] = [];
+  if (daysAgo <= 7) reasons.push('近期讨论度高');
+  if (likes >= 1000) reasons.push('点赞表现较好');
+  if (comments.length >= 2) reasons.push('评论区有追问点');
+  if (tags.length > 0) reasons.push(`标签覆盖: ${tags.slice(0, 3).join(' / ')}`);
+  if (reasons.length === 0) reasons.push('可作为稳妥补位选题');
+
+  const firstQuestion = comments.find((c: unknown) => String(c).trim().length > 0);
+  const angle = firstQuestion
+    ? `从评论区问题切入: "${String(firstQuestion).slice(0, 28)}" 并给出你的实战答案`
+    : '从你的实习/项目经历切入，写一个可复用模板';
+
+  return { score, reasons, angle };
+}
+
+async function readReviewList(): Promise<any[]> {
+  try {
+    const raw = await fs.promises.readFile(REVIEWS_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeReviewList(items: any[]): Promise<void> {
+  await fs.promises.mkdir(path.dirname(REVIEWS_PATH), { recursive: true });
+  await fs.promises.writeFile(REVIEWS_PATH, `${JSON.stringify(items, null, 2)}\n`, 'utf-8');
+}
+
 app.get('/api/rewrite/welcome', (_req, res) => {
   res.json({ message: WW_WELCOME_MESSAGE });
 });
@@ -275,6 +349,150 @@ app.post('/api/rewrite/export', async (req, res) => {
     res.json({ mdPath, imagePaths: [] });
   } catch (err: any) {
     console.error('[rewrite/export] error', err);
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.get('/api/stats', async (_req, res) => {
+  try {
+    let notes = 0;
+    let drafts = 0;
+    let reports = 0;
+
+    try {
+      const content = await fs.promises.readFile(DB_PATH, 'utf-8');
+      notes = toQuestionArray(JSON.parse(content)).length;
+    } catch {
+      notes = 0;
+    }
+
+    try {
+      const files = await fs.promises.readdir(DRAFTS_DIR);
+      drafts = files.filter((name) => /\.md$/i.test(name)).length;
+    } catch {
+      drafts = 0;
+    }
+
+    try {
+      const files = await fs.promises.readdir(path.join(PROJECT_ROOT, 'reports'));
+      reports = files.filter((name) => /^daily.*\.md$/i.test(name)).length;
+    } catch {
+      reports = 0;
+    }
+
+    res.json({
+      notes,
+      drafts,
+      reports,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.get('/api/creator/topics', async (req, res) => {
+  try {
+    const requestedLimit = Number(req.query.limit || 3);
+    const limit = Math.max(1, Math.min(8, Number.isFinite(requestedLimit) ? requestedLimit : 3));
+
+    const content = await fs.promises.readFile(DB_PATH, 'utf-8');
+    const list = toQuestionArray(JSON.parse(content));
+
+    const ranked = list
+      .map((item) => {
+        const { score, reasons, angle } = computeTopicSuggestion(item);
+        return {
+          id: String(item?.id || ''),
+          title: String(item?.title || '未命名选题'),
+          summary: String(item?.summary || ''),
+          link: String(item?.link || ''),
+          tags: Array.isArray(item?.tags) ? item.tags : [],
+          likes: parseMetric(item?.likes),
+          score,
+          reasons,
+          angle,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    res.json({
+      items: ranked,
+      total: list.length,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(404).json({ error: err?.message || 'Topics not found' });
+  }
+});
+
+app.get('/api/creator/reviews', async (req, res) => {
+  try {
+    const requestedLimit = Number(req.query.limit || 10);
+    const limit = Math.max(1, Math.min(50, Number.isFinite(requestedLimit) ? requestedLimit : 10));
+    const items = await readReviewList();
+    const sorted = items
+      .slice()
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+      .slice(0, limit);
+    res.json({ items: sorted, total: items.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || String(err) });
+  }
+});
+
+app.post('/api/creator/reviews', async (req, res) => {
+  try {
+    const body = (req.body || {}) as {
+      topic?: string;
+      noteUrl?: string;
+      impressions?: number;
+      likes?: number;
+      saves?: number;
+      comments?: number;
+      follows?: number;
+      reflection?: string;
+    };
+
+    const topic = String(body.topic || '').trim();
+    if (!topic) {
+      return res.status(400).json({ error: 'topic is required' });
+    }
+
+    const toCount = (v: unknown) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+    };
+
+    const impressions = toCount(body.impressions);
+    const likes = toCount(body.likes);
+    const saves = toCount(body.saves);
+    const comments = toCount(body.comments);
+    const follows = toCount(body.follows);
+    const engagementBase = likes + saves + comments;
+    const engagementRate = impressions > 0 ? Number(((engagementBase / impressions) * 100).toFixed(2)) : 0;
+
+    const item = {
+      id: `review_${Date.now()}`,
+      topic,
+      noteUrl: String(body.noteUrl || '').trim(),
+      impressions,
+      likes,
+      saves,
+      comments,
+      follows,
+      engagementRate,
+      reflection: String(body.reflection || '').trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const items = await readReviewList();
+    items.unshift(item);
+    await writeReviewList(items.slice(0, 200));
+
+    res.json({ ok: true, item });
+  } catch (err: any) {
     res.status(500).json({ error: err?.message || String(err) });
   }
 });

@@ -373,3 +373,47 @@ d:\AIlearn\xhs_automation\error_screenshot.png
 ---
 
 **Made with ❤️ by 搜广推实习生**
+
+## Creator Assistant (Personal Blogger MVP)
+
+Added on 2026-02-21 for solo creator workflow (not replacing Xiaohongshu official tools).
+
+- Entry: `Dashboard -> 改写工坊 -> 创作者助手`
+- Scope: topic picking, preflight checks, publish-pack generation, lightweight review
+- Goal: reduce daily decision cost and improve stable posting quality
+
+### Included Modules
+
+1. Today's Topic Suggestions
+- Button: `刷新选题`
+- Actions: `用作标题` / `填入素材区`
+
+2. Preflight Check
+- Button: `一键检查`
+- Checks: title length, content depth, paragraph structure, tags, personal voice, CTA
+
+3. Publish Pack
+- Buttons: `生成` / `复制`
+- Output: title + body + tags + suggested first comment
+
+4. Lightweight Review
+- Button: `保存复盘`
+- Fields: topic, URL, impressions, likes, saves, comments, follows, reflection
+- Output: engagement rate + recent records
+
+### New API Endpoints
+
+- `GET /api/stats`
+- `GET /api/creator/topics?limit=3`
+- `GET /api/creator/reviews?limit=5`
+- `POST /api/creator/reviews`
+
+### Data File
+
+- `data/creator_reviews.json`
+
+### Product Note
+
+This module is intentionally lightweight: it complements Xiaohongshu's native creator tools instead of rebuilding analytics/ads/collaboration systems.
+
+See details: `CREATOR_MVP.md`

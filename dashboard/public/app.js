@@ -49,6 +49,9 @@ const terminalEl = getElement('terminal', 'Terminal');
 const reportEl = getElement('report', 'Report');
 const databaseStatsEl = getElement('database-stats', 'Database Stats');
 const databaseListEl = getElement('database-list', 'Database List');
+const statNotesEl = getElement('stat-notes', 'Stat Notes');
+const statDbEl = getElement('stat-db', 'Stat DB');
+const statDraftsEl = getElement('stat-drafts', 'Stat Drafts');
 
 // Rewrite Workshop Elements
 const rewriteMaterial = getElement('rewrite-material', 'Rewrite Material');
@@ -66,6 +69,24 @@ const rewriteWelcome = getElement('rewrite-welcome', 'Rewrite Welcome');
 const rewriteExportResult = getElement('rewrite-export-result', 'Rewrite Export Result');
 const btnRefreshReport = getElement('refresh-report', 'Refresh Report Button');
 const btnRefreshDb = getElement('refresh-db', 'Refresh DB Button');
+const btnRefreshTopics = getElement('refresh-topics', 'Refresh Topics Button');
+const creatorTopicsEl = getElement('creator-topics', 'Creator Topics');
+const btnRunPreflight = getElement('run-preflight', 'Run Preflight Button');
+const preflightSummaryEl = getElement('preflight-summary', 'Preflight Summary');
+const preflightListEl = getElement('preflight-list', 'Preflight List');
+const btnBuildPublishPack = getElement('build-publish-pack', 'Build Publish Pack Button');
+const btnCopyPublishPack = getElement('copy-publish-pack', 'Copy Publish Pack Button');
+const publishPackEl = getElement('publish-pack', 'Publish Pack');
+const btnSaveReview = getElement('save-review', 'Save Review Button');
+const reviewTopicEl = getElement('review-topic', 'Review Topic Input');
+const reviewUrlEl = getElement('review-url', 'Review URL Input');
+const reviewImpressionsEl = getElement('review-impressions', 'Review Impressions Input');
+const reviewLikesEl = getElement('review-likes', 'Review Likes Input');
+const reviewSavesEl = getElement('review-saves', 'Review Saves Input');
+const reviewCommentsEl = getElement('review-comments', 'Review Comments Input');
+const reviewFollowsEl = getElement('review-follows', 'Review Follows Input');
+const reviewReflectionEl = getElement('review-reflection', 'Review Reflection Input');
+const reviewRecentEl = getElement('review-recent', 'Review Recent List');
 
 // State
 let currentView = 'dashboard';
@@ -73,6 +94,7 @@ let isRunning = false;
 let socket = null;
 let autoScroll = true;
 let rewriteWelcomeLoaded = false;
+let latestTopicSuggestions = [];
 
 // View Titles
 const viewTitles = {
@@ -101,6 +123,9 @@ function init() {
     
     log('Loading welcome banner...');
     loadWelcomeBanner();
+
+    log('Loading quick stats...');
+    loadDashboardStats();
     
     log('Dashboard initialized successfully!');
   } catch (err) {
@@ -147,7 +172,12 @@ function switchView(view) {
   // Load content if needed
   if (view === 'report') fetchReport();
   if (view === 'database') fetchDatabase();
-  if (view === 'rewrite' && !rewriteWelcomeLoaded) loadWelcomeBanner();
+  if (view === 'rewrite') {
+    if (!rewriteWelcomeLoaded) loadWelcomeBanner();
+    fetchCreatorTopics();
+    fetchRecentReviews();
+  }
+  if (view === 'dashboard') loadDashboardStats();
 }
 
 // Socket.IO
@@ -220,6 +250,24 @@ function bindActions() {
   if (btnClearLog) btnClearLog.addEventListener('click', clearLog);
   if (btnRefreshReport) btnRefreshReport.addEventListener('click', fetchReport);
   if (btnRefreshDb) btnRefreshDb.addEventListener('click', fetchDatabase);
+  if (btnRefreshTopics) btnRefreshTopics.addEventListener('click', fetchCreatorTopics);
+  if (btnRunPreflight) btnRunPreflight.addEventListener('click', runPreflightCheck);
+  if (btnBuildPublishPack) btnBuildPublishPack.addEventListener('click', buildPublishPack);
+  if (btnCopyPublishPack) btnCopyPublishPack.addEventListener('click', copyPublishPack);
+  if (btnSaveReview) btnSaveReview.addEventListener('click', saveReview);
+}
+
+async function loadDashboardStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '统计加载失败');
+    if (statNotesEl) statNotesEl.textContent = String(data.notes || 0);
+    if (statDbEl) statDbEl.textContent = String(data.notes || 0);
+    if (statDraftsEl) statDraftsEl.textContent = String(data.drafts || 0);
+  } catch (err) {
+    log('Stats load failed:', err.message);
+  }
 }
 
 async function runScript(script) {
@@ -249,8 +297,13 @@ async function fetchReport() {
   try {
     const res = await fetch('/api/report');
     const data = await res.json();
-    if (data.markdown) {
-      reportEl.innerHTML = marked.parse(data.markdown);
+    const renderMarkdown = (md) => {
+      if (typeof marked !== 'undefined' && marked?.parse) return marked.parse(md);
+      return `<pre>${escapeHtml(md)}</pre>`;
+    };
+    const html = data.html || (data.content ? renderMarkdown(data.content) : '') || (data.markdown ? renderMarkdown(data.markdown) : '');
+    if (html) {
+      reportEl.innerHTML = html;
     } else {
       reportEl.innerHTML = '<p class="text-muted">暂无日报数据</p>';
     }
@@ -264,6 +317,7 @@ async function fetchDatabase() {
     const res = await fetch('/api/database');
     const data = await res.json();
     renderDatabaseJson(data);
+    loadDashboardStats();
   } catch (err) {
     if (databaseListEl) {
       databaseListEl.innerHTML = `<div class="db-empty"><div class="db-empty-icon">⚠️</div><div>加载失败: ${err.message}</div></div>`;
@@ -388,6 +442,213 @@ function renderDatabaseJson(data) {
   databaseListEl.innerHTML = statsHtml + `<div style="max-height: calc(100vh - 250px); overflow-y: auto; padding-right: 8px;">${itemsHtml}</div>`;
 }
 
+async function fetchCreatorTopics() {
+  if (!creatorTopicsEl) return;
+  try {
+    creatorTopicsEl.innerHTML = '<div class="assistant-empty">正在生成选题建议...</div>';
+    const res = await fetch('/api/creator/topics?limit=3');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '选题加载失败');
+    latestTopicSuggestions = Array.isArray(data.items) ? data.items : [];
+    renderCreatorTopics();
+  } catch (err) {
+    creatorTopicsEl.innerHTML = `<div class="assistant-empty">加载失败: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderCreatorTopics() {
+  if (!creatorTopicsEl) return;
+  if (!latestTopicSuggestions.length) {
+    creatorTopicsEl.innerHTML = '<div class="assistant-empty">暂无可用选题，请先执行一次情报采集</div>';
+    return;
+  }
+
+  creatorTopicsEl.innerHTML = latestTopicSuggestions.map((item, idx) => `
+    <div class="topic-item">
+      <div class="topic-head">
+        <div class="topic-title">${escapeHtml(item.title || '未命名选题')}</div>
+        <span class="topic-score">评分 ${Number(item.score || 0)}</span>
+      </div>
+      <div class="topic-meta">热度 ${Number(item.likes || 0)} · ${(item.reasons || []).map((r) => escapeHtml(r)).join(' / ')}</div>
+      <div class="topic-angle">${escapeHtml(item.angle || '从你的实战经验切入，写可复用方法')}</div>
+      <div class="topic-actions">
+        <button class="btn btn-outline btn-sm topic-use-title" data-idx="${idx}">用作标题</button>
+        <button class="btn btn-outline btn-sm topic-use-material" data-idx="${idx}">填入素材区</button>
+      </div>
+    </div>
+  `).join('');
+
+  creatorTopicsEl.querySelectorAll('.topic-use-title').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const item = latestTopicSuggestions[idx];
+      if (!item) return;
+      if (rewriteTitle) rewriteTitle.value = item.title || '';
+      showToast('已将选题填入标题', 'success');
+    });
+  });
+
+  creatorTopicsEl.querySelectorAll('.topic-use-material').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      const item = latestTopicSuggestions[idx];
+      if (!item) return;
+      const material = [
+        `选题：${item.title || ''}`,
+        item.summary ? `背景：${item.summary}` : '',
+        item.angle ? `建议切入：${item.angle}` : '',
+      ].filter(Boolean).join('\n');
+      if (rewriteMaterial) rewriteMaterial.value = material;
+      if (rewriteType) rewriteType.textContent = '已填入选题素材';
+      showToast('已填入素材区，可直接改写', 'success');
+    });
+  });
+}
+
+function runPreflightCheck() {
+  const title = rewriteTitle?.value?.trim() || '';
+  const content = rewriteContent?.value?.trim() || '';
+  const tags = (rewriteTags?.value || '').split(/\s+/).filter(Boolean);
+  const paragraphs = content.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+
+  const checks = [
+    { ok: title.length >= 12 && title.length <= 24, weight: 20, message: '标题长度建议 12-24 字' },
+    { ok: content.length >= 220, weight: 25, message: '正文建议至少 220 字，信息密度更稳定' },
+    { ok: paragraphs.length >= 4, weight: 15, message: '段落建议不少于 4 段，阅读更友好' },
+    { ok: tags.length >= 3 && tags.length <= 8, weight: 20, message: '标签建议 3-8 个' },
+    { ok: /(我|自己|复盘|踩坑|实习|项目|经验)/.test(content), weight: 10, message: '建议加入“你自己的经历/观点”' },
+    { ok: /(欢迎|评论区|私信|一起交流|你也可以|有问题)/.test(content), weight: 10, message: '结尾建议有互动引导（CTA）' },
+  ];
+
+  const score = checks.reduce((sum, item) => sum + (item.ok ? item.weight : 0), 0);
+  if (preflightSummaryEl) {
+    preflightSummaryEl.textContent = `检查完成: ${score}/100 ${score >= 80 ? '（可发布）' : '（建议优化后再发）'}`;
+  }
+  if (preflightListEl) {
+    preflightListEl.innerHTML = checks.map((item) => `
+      <div class="preflight-item ${item.ok ? 'ok' : 'warn'}">
+        ${item.ok ? '✓' : '!'} ${item.message}
+      </div>
+    `).join('');
+  }
+
+  return { score, checks };
+}
+
+function buildPublishPack() {
+  const title = rewriteTitle?.value?.trim() || '';
+  const content = rewriteContent?.value?.trim() || '';
+  const tags = (rewriteTags?.value || '').split(/\s+/).filter(Boolean);
+
+  if (!title || !content) {
+    showToast('请先完成标题和正文', 'error');
+    return;
+  }
+
+  const firstComment = generateFirstComment(content, tags);
+  const pack = [
+    '【标题】',
+    title,
+    '',
+    '【正文】',
+    content,
+    '',
+    '【标签】',
+    tags.join(' ') || '#小红书 #内容创作',
+    '',
+    '【首评建议】',
+    firstComment,
+  ].join('\n');
+
+  if (publishPackEl) publishPackEl.value = pack;
+  showToast('发布包已生成，可直接复制', 'success');
+}
+
+function generateFirstComment(content, tags) {
+  const firstLine = content
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .find((s) => s.length > 0) || '';
+  const shortLine = firstLine.length > 48 ? `${firstLine.slice(0, 48)}...` : firstLine;
+  const tagHint = tags.slice(0, 2).join(' ');
+  return `补充一句：${shortLine}\n如果你也在做类似方向，欢迎评论区交流。${tagHint}`.trim();
+}
+
+async function copyPublishPack() {
+  const text = publishPackEl?.value?.trim() || '';
+  if (!text) {
+    showToast('先点击“生成”再复制', 'error');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('发布包已复制', 'success');
+  } catch (err) {
+    showToast('复制失败，请手动复制', 'error');
+  }
+}
+
+async function saveReview() {
+  const topic = reviewTopicEl?.value?.trim() || '';
+  if (!topic) {
+    showToast('请先填写复盘主题', 'error');
+    return;
+  }
+
+  const toNumber = (el) => {
+    const val = Number(el?.value || 0);
+    return Number.isFinite(val) ? Math.max(0, Math.round(val)) : 0;
+  };
+
+  const payload = {
+    topic,
+    noteUrl: reviewUrlEl?.value?.trim() || '',
+    impressions: toNumber(reviewImpressionsEl),
+    likes: toNumber(reviewLikesEl),
+    saves: toNumber(reviewSavesEl),
+    comments: toNumber(reviewCommentsEl),
+    follows: toNumber(reviewFollowsEl),
+    reflection: reviewReflectionEl?.value?.trim() || '',
+  };
+
+  try {
+    const res = await fetch('/api/creator/reviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '保存失败');
+    showToast(`复盘已保存，互动率 ${data.item?.engagementRate ?? 0}%`, 'success');
+    fetchRecentReviews();
+  } catch (err) {
+    showToast(`保存失败: ${err.message}`, 'error');
+  }
+}
+
+async function fetchRecentReviews() {
+  if (!reviewRecentEl) return;
+  try {
+    const res = await fetch('/api/creator/reviews?limit=5');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '加载失败');
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) {
+      reviewRecentEl.innerHTML = '<div class="assistant-empty">暂无复盘记录，建议每篇发布后记一条</div>';
+      return;
+    }
+    reviewRecentEl.innerHTML = items.map((item) => `
+      <div class="review-item">
+        <strong>${escapeHtml(item.topic || '未命名')}</strong><br/>
+        互动率: ${Number(item.engagementRate || 0)}% · 曝光: ${Number(item.impressions || 0)} · 点赞: ${Number(item.likes || 0)} · 收藏: ${Number(item.saves || 0)}<br/>
+        ${item.reflection ? `复盘: ${escapeHtml(item.reflection)}` : ''}
+      </div>
+    `).join('');
+  } catch (err) {
+    reviewRecentEl.innerHTML = `<div class="assistant-empty">复盘加载失败: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
 // Rewrite Studio
 function bindRewriteStudio() {
   if (!rewriteRun || !rewriteExport) return;
@@ -468,6 +729,7 @@ async function runRewrite() {
     
     // Render headlines
     renderHeadlines(data.headlines || []);
+    runPreflightCheck();
     
   } catch (err) {
     rewriteType.textContent = err.message;
@@ -527,6 +789,7 @@ async function exportRewrite() {
     if (!res.ok) throw new Error(data.error || '导出失败');
     
     showToast(`已导出: ${data.mdPath || '成功'}`, 'success');
+    loadDashboardStats();
     
   } catch (err) {
     showToast(err.message, 'error');
@@ -544,6 +807,9 @@ function clearRewrite() {
   if (rewriteType) rewriteType.textContent = '准备就绪';
   if (rewriteHeadlines) rewriteHeadlines.innerHTML = '<span class="headline-placeholder">点击"开始改写"生成标题建议</span>';
   if (rewriteWelcome) rewriteWelcome.classList.add('hidden');
+  if (publishPackEl) publishPackEl.value = '';
+  if (preflightSummaryEl) preflightSummaryEl.textContent = '等待检查';
+  if (preflightListEl) preflightListEl.innerHTML = '';
 }
 
 function showToast(message, type = 'success') {

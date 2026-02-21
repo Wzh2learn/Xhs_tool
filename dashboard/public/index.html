@@ -338,6 +338,57 @@ Ctrl + Enter = 开始改写"></textarea>
 
             <!-- 导出结果提示 -->
             <div id="rewrite-export-result" class="export-toast hidden"></div>
+
+            <!-- 创作者助手 -->
+            <section class="creator-assistant">
+              <div class="assistant-card">
+                <div class="assistant-header">
+                  <h4>今日选题建议</h4>
+                  <button class="btn btn-ghost btn-sm" id="refresh-topics">刷新选题</button>
+                </div>
+                <div id="creator-topics" class="topic-list">
+                  <div class="assistant-empty">点击“刷新选题”获取今日可写方向</div>
+                </div>
+              </div>
+
+              <div class="assistant-card">
+                <div class="assistant-header">
+                  <h4>发布前检查</h4>
+                  <button class="btn btn-ghost btn-sm" id="run-preflight">一键检查</button>
+                </div>
+                <div id="preflight-summary" class="preflight-score">等待检查</div>
+                <div id="preflight-list" class="preflight-list"></div>
+              </div>
+
+              <div class="assistant-card">
+                <div class="assistant-header">
+                  <h4>一键发布包</h4>
+                  <div class="assistant-actions">
+                    <button class="btn btn-ghost btn-sm" id="build-publish-pack">生成</button>
+                    <button class="btn btn-ghost btn-sm" id="copy-publish-pack">复制</button>
+                  </div>
+                </div>
+                <textarea id="publish-pack" class="assistant-textarea" readonly placeholder="点击“生成”后，这里会输出可直接粘贴到发布流程的完整内容包"></textarea>
+              </div>
+
+              <div class="assistant-card">
+                <div class="assistant-header">
+                  <h4>轻复盘</h4>
+                  <button class="btn btn-ghost btn-sm" id="save-review">保存复盘</button>
+                </div>
+                <div class="review-grid">
+                  <input id="review-topic" class="review-input" placeholder="本条内容主题（必填）" />
+                  <input id="review-url" class="review-input" placeholder="笔记链接（可选）" />
+                  <input id="review-impressions" class="review-input" type="number" min="0" placeholder="曝光" />
+                  <input id="review-likes" class="review-input" type="number" min="0" placeholder="点赞" />
+                  <input id="review-saves" class="review-input" type="number" min="0" placeholder="收藏" />
+                  <input id="review-comments" class="review-input" type="number" min="0" placeholder="评论" />
+                  <input id="review-follows" class="review-input" type="number" min="0" placeholder="涨粉" />
+                </div>
+                <textarea id="review-reflection" class="assistant-textarea review-reflection" placeholder="一句话复盘：这条内容为什么好/不好，下次如何改"></textarea>
+                <div id="review-recent" class="review-recent"></div>
+              </div>
+            </section>
           </div>
         </div>
       </div>

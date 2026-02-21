@@ -118,3 +118,28 @@ rm -rf reports/* data/*
 ## Security Note
 - Never commit cookie/session files (e.g. xhs_cookies.json, xhs_cookies.json.bak).
 - Keep generated drafts under content/drafts/ local-only unless explicitly needed.
+
+## Creator Assistant Quick Use
+
+Entry: `Dashboard -> 改写工坊 -> 创作者助手`
+
+### Buttons
+- `刷新选题`: pull top topic ideas from local database
+- `一键检查`: generate readiness score (0-100)
+- `生成`: build publish pack
+- `复制`: copy publish pack for direct paste
+- `保存复盘`: store post metrics and reflection
+
+### APIs
+- `GET /api/stats`
+- `GET /api/creator/topics?limit=3`
+- `GET /api/creator/reviews?limit=5`
+- `POST /api/creator/reviews`
+
+### Data
+- `data/creator_reviews.json`
+
+### Tips
+- Use this tool for execution quality, not full运营中台
+- Keep platform analytics in Xiaohongshu native creator tools
+- Recommended cadence: post -> save one review immediately
